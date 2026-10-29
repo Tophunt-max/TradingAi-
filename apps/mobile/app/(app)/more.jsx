@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { Card, CardHeader, ListRow, Screen } from '../../components/ui';
-import { FEATURES, MORE_SECTIONS } from '../../features/roadmap';
+import { Badge, Card, CardHeader, ListRow, Screen } from '../../components/ui';
+import { FEATURES, MORE_SECTIONS, featureHref } from '../../features/roadmap';
 
 export default function More() {
   return (
@@ -8,16 +8,20 @@ export default function More() {
       {MORE_SECTIONS.map((section) => (
         <Card key={section.title}>
           <CardHeader title={section.title} />
-          {section.items.map((id) => (
-            <ListRow
-              key={id}
-              testID={`more-${id}`}
-              title={FEATURES[id].title}
-              subtitle={`Phase ${FEATURES[id].phase} · not built yet`}
-              icon={FEATURES[id].icon}
-              onPress={() => router.push(`/feature/${id}`)}
-            />
-          ))}
+          {section.items.map((id) => {
+            const f = FEATURES[id];
+            return (
+              <ListRow
+                key={id}
+                testID={`more-${id}`}
+                title={f.title}
+                subtitle={f.summary}
+                icon={f.icon}
+                right={f.route ? null : <Badge label={`PHASE ${f.phase}`} />}
+                onPress={() => router.push(featureHref(id))}
+              />
+            );
+          })}
         </Card>
       ))}
       <Card>

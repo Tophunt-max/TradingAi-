@@ -10,12 +10,13 @@
     "web": "expo start --web",
     "export:web": "expo export --platform web",
     "test": "jest",
-    "lint": "expo lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
     "@expo/vector-icons": "^15.0.2",
     "@tanstack/react-query": "^5.105.0",
+    "eslint-config-expo": "~58.0.4",
     "expo": "^58.0.21",
     "expo-constants": "~58.0.14",
     "expo-font": "~58.0.11",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
+    "eslint": "^9.39.5",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.13"
   },

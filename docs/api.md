@@ -40,6 +40,27 @@ served at `http://localhost:8000/docs` in development and test only.
 | GET | `/users/me/audit-logs` | ✓ | Own audit history |
 | GET | `/admin/audit-logs` | admin | Filter by `user_id`, `action` |
 | GET | `/market/indices` | ✓ | **DEMO** synthetic data only |
+| GET | `/market/quotes?segment=&symbols=` | ✓ | DEMO quotes (indices + stocks) |
+| GET | `/market/movers` | ✓ | DEMO gainers, losers, relative-volume leaders |
+| GET | `/market/search?q=` | ✓ | Supported instruments |
+| GET | `/charts/{symbol}/candles?timeframe=&limit=&indicators=` | ✓ | Closed candles only. Indicators: `ema9,ema21,ema50,ema200,rsi14,macd,bb20,atr14` |
+| GET | `/options/{NIFTY\|BANKNIFTY}/expiries` | ✓ | DEMO dates, not the exchange calendar |
+| GET | `/options/{underlying}/chain?expiry=&strikes=` | ✓ | DEMO chain, Black-Scholes Greeks. `lot_size`/`tick_size` are `null` |
+| GET | `/analysis/{symbol}?timeframe=` | ✓ | Rule-based trend + confirmed levels. `probabilities: null`, `decision: NO_TRADE` |
+| GET | `/bots/strategies` | ✓ | Strategy catalogue / templates |
+| POST | `/bots/ai-draft` | ✓ | Rule-based draft bounded by global risk limits |
+| GET/POST | `/bots` | ✓ | List (filter `status`) / create a PAPER draft |
+| GET/PUT | `/bots/{id}` | ✓ | PUT creates a new immutable config version |
+| POST | `/bots/{id}/clone` | ✓ | |
+| DELETE | `/bots/{id}?confirm=true` | ✓ | Requires explicit confirmation |
+| POST | `/bots/{id}/validate` | ✓ | Pre-activation checks against global limits |
+| POST | `/bots/{id}/start\|pause\|resume\|stop` | ✓ | 409 `EXECUTION_UNAVAILABLE` until Phase 6 |
+| GET | `/risk` | ✓ | Global limits, usage, block reasons |
+| PATCH | `/risk/limits` | ✓ | Cross-field validated, audited |
+| POST | `/risk/kill-switch` | ✓ | `{engaged, confirm: true}`; persisted |
+| GET | `/portfolio`, `/orders`, `/positions` | ✓ | Real paper ledger (empty until Phase 6) |
+| GET | `/alerts?category=` | ✓ | Derived from your audit trail |
+| GET | `/brokers` | ✓ | Paper adapter + planned brokers (none integrated) |
 
 ## Example requests
 

@@ -116,18 +116,69 @@ def main() -> int:
             if shots:
                 page.screenshot(path=str(shots / "02-home.png"), full_page=True)
 
-            for tab, heading in [("Markets", "Markets"), ("AI Lab", "AI Lab"),
-                                 ("Bots", "Bots"), ("Portfolio", "Portfolio")]:
-                page.get_by_role("tab", name=tab).click()
-                expect(page.get_by_role("heading", name=heading)).to_be_visible()
-            if shots:
-                page.screenshot(path=str(shots / "03-portfolio.png"), full_page=True)
+            def shot(name: str) -> None:
+                if shots:
+                    page.screenshot(path=str(shots / f"{name}.png"), full_page=True)
+
+            # Option chain from the Home quick action.
+            page.get_by_test_id("qa-options").click()
+            expect(page.get_by_test_id("option-chain-table")).to_be_visible(timeout=10_000)
+            expect(page.get_by_test_id("chain-metadata-note")).to_contain_text("Lot size")
+            shot("03-option-chain")
+            page.go_back()
+
+            # Markets -> chart.
+            page.get_by_role("tab", name="Markets").click()
+            expect(page.get_by_role("heading", name="Markets")).to_be_visible()
+            shot("04-markets")
+            page.get_by_test_id("quote-NIFTY").click()
+            expect(page.get_by_test_id("candle-chart")).to_be_visible(timeout=10_000)
+            shot("05-chart")
+            page.go_back()
+
+            # AI analysis abstains.
+            page.get_by_role("tab", name="AI Lab").click()
+            expect(page.get_by_test_id("analysis-decision")).to_contain_text("NO TRADE",
+                                                                              timeout=10_000)
+            shot("06-ai-analysis")
+
+            # AI Auto Create -> saved draft -> validation blocks activation.
+            page.get_by_role("tab", name="Bots").click()
+            page.get_by_test_id("create-bot").click()
+            page.get_by_test_id("new-ai").click()
+            page.get_by_role("button", name="Next").click()
+            page.get_by_test_id("ai-generate").click()
+            expect(page.get_by_text("Why this configuration")).to_be_visible(timeout=10_000)
+            shot("07-ai-create-review")
+            page.get_by_test_id("ai-save").click()
+            expect(page.get_by_test_id("validation-report")).to_contain_text("BLOCKED",
+                                                                             timeout=10_000)
+            page.get_by_test_id("bot-start").click()
+            expect(page.get_by_test_id("bot-notice")).to_contain_text("cannot run yet")
+            shot("08-bot-detail")
+            page.go_back()
+            page.go_back()
+            expect(page.get_by_role("heading", name="My Bots")).to_be_visible()
+            expect(page.get_by_text("NIFTY Momentum CE")).to_be_visible(timeout=10_000)
+            shot("09-my-bots")
+
+            # Portfolio -> Risk Center -> kill switch.
+            page.get_by_role("tab", name="Portfolio").click()
+            expect(page.get_by_test_id("portfolio-summary")).to_be_visible(timeout=10_000)
+            shot("10-portfolio")
+            page.get_by_role("button", name="Risk Center").click()
+            page.get_by_test_id("kill-switch").click()
+            page.get_by_role("alert").get_by_role("button", name="Engage").click()
+            expect(page.get_by_role("button", name="Release kill switch")).to_be_visible(
+                timeout=10_000)
+            expect(page.get_by_role("alert")).to_have_count(0, timeout=5_000)
+            shot("11-risk-center")
+            page.go_back()
 
             page.get_by_role("tab", name="Home").click()
             page.get_by_role("button", name="Profile and settings").click()
             expect(page.get_by_text("App preferences")).to_be_visible(timeout=10_000)
-            if shots:
-                page.screenshot(path=str(shots / "04-settings.png"), full_page=True)
+            shot("12-settings")
             page.get_by_test_id("logout").click()
             page.get_by_role("alert").get_by_role("button", name="Log out").click()
             expect(page.get_by_test_id("welcome-login")).to_be_visible(timeout=10_000)

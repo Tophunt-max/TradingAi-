@@ -8,10 +8,24 @@ from app.models.auth import (
     VerificationCode,
     VerificationPurpose,
 )
+from app.models.bots import (
+    Bot,
+    BotConfigVersion,
+    BotCreationMethod,
+    BotStatus,
+    RiskSettings,
+    TradingMode,
+)
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
     "AuditLog",
+    "Bot",
+    "BotConfigVersion",
+    "BotCreationMethod",
+    "BotStatus",
+    "RiskSettings",
+    "TradingMode",
     "RefreshToken",
     "User",
     "UserPreferences",

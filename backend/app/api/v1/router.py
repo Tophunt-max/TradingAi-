@@ -1,7 +1,22 @@
 from fastapi import APIRouter
 
-from app.api.v1 import admin, auth, health, market, system, users
+from app.api.v1 import (
+    admin,
+    alerts,
+    analysis,
+    auth,
+    bots,
+    charts,
+    health,
+    market,
+    options,
+    portfolio,
+    risk,
+    system,
+    users,
+)
 
 api_router = APIRouter(prefix="/api/v1")
-for module in (health, system, auth, users, admin, market):
+for module in (health, system, auth, users, admin, market, charts, options, analysis, bots,
+               risk, portfolio, alerts):
     api_router.include_router(module.router)

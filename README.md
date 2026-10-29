@@ -10,7 +10,22 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 > not live profits and do not guarantee future returns. **Live trading is disabled in
 > this build.**
 
-## Current status: Phase 1 (foundation) complete
+## Current status: Phase 2 (mobile UI) complete
+
+Phase 2 added the screens from the design mockup, wired to real API contracts:
+Home dashboard, Markets (indices, stocks, movers, search), candlestick chart with
+EMA / Bollinger / RSI / MACD, Option Chain with Greeks, AI Market Analysis, My Bots,
+AI Auto Create (4-step wizard), Manual Bot Builder (6 steps), Strategy Templates,
+Bot Details with validation, Portfolio / Orders / Positions, Risk Center with a
+persistent kill switch, Notifications, Broker Connections, Screener and Learn & Grow.
+Screenshots from the automated browser test are in [docs/screenshots](docs/screenshots).
+
+What is real vs. placeholder in Phase 2:
+- **Real and saved in the database:** bot configurations (versioned), global risk limits, the kill switch, and alerts (built from your audit trail).
+- **Synthetic, labelled `DEMO`:** quotes, candles, option chain and the inputs to the analysis.
+- **Empty until Phase 6:** orders, positions and P&L. A "Preview sample layout" toggle shows labelled sample rows.
+- **Not shown on purpose:** AI probabilities (no calibrated model yet) and lot sizes (no instrument master yet).
+- **Not built:** Google/Apple sign-in from the mockup, and the Backtesting Lab and Model Lab screens (Phase 7).
 
 | Area | State |
 |---|---|
@@ -21,6 +36,8 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 | Audit trail (user + admin views), RBAC (`user`, `admin`) | ✅ |
 | Expo app: design system, auth flow, 5-tab navigation, More menu, settings, sessions, audit, system health | ✅ |
 | Demo market data, labelled `DEMO` everywhere | ✅ |
+| Phase 2 screens + APIs (charts, option chain, analysis, bots, risk, portfolio, alerts, brokers) | ✅ |
+| Causal indicators (EMA, RSI, MACD, Bollinger, ATR, confirmed pivots) and Black-Scholes Greeks | ✅ |
 | Market data, analysis engine, bots, risk manager, paper execution, backtesting, broker integration | ❌ Not built (Phases 3–9) |
 
 Screens for unbuilt modules show "Not built yet · Phase N" and no numbers.
@@ -70,7 +87,7 @@ python scripts/e2e_web_smoke.py --dist apps/mobile/dist      # browser E2E (need
 | Phase | Scope |
 |---|---|
 | 1 ✅ | Foundation: repo, design system, auth, DB, API, navigation, demo mode |
-| 2 | Mobile UI for dashboard, markets, charts, option chain, AI, bots, orders, positions, portfolio, risk center, alerts, wired to typed contracts |
+| 2 ✅ | Mobile UI for dashboard, markets, charts, option chain, AI, bots, orders, positions, portfolio, risk center, alerts, wired to typed contracts |
 | 3 | Authorised market-data provider, instrument master, candles, live updates, option chain, data-quality validation |
 | 4 | Indicators, candlestick patterns, SMC, regime detection, strategy router, baseline AI predictions, explanations |
 | 5 | Bot system: AI Auto Create, manual builder, templates, validation, lifecycle, persistent workers |
@@ -96,6 +113,12 @@ ke results asli (live) profit nahi hote. **Is build mein live trading band hai.*
 - Backend (FastAPI + PostgreSQL): signup, OTP verification, login, sessions, password reset aur audit log.
 - Mobile app (Expo): dark theme design system, login/signup screens, 5 tabs (Home, Markets, AI Lab, Bots, Portfolio), settings.
 - Market data sirf **DEMO** (nakli) hai, aur har jagah "DEMO" badge dikhta hai.
+
+**Phase 2 mein kya aaya:** Home dashboard, Markets, candlestick chart (EMA/RSI/MACD), Option Chain (Greeks ke saath),
+AI Analysis, My Bots, AI Auto Create, Manual Bot Builder, Templates, Bot Details, Portfolio/Orders/Positions,
+Risk Center (kill switch ke saath), Notifications, Broker Connections, Screener aur Learn & Grow.
+Bots aur risk limits database mein save hote hain. Orders aur P&L abhi khaali hain (Phase 6 se bharenge),
+aur AI probability tab tak nahi dikhegi jab tak calibrated model ready nahi hota.
 
 **Abhi kya baaki hai:** Real market data, AI analysis, bots, risk manager, paper
 execution, backtesting aur broker integration. Ye sab agle phases mein banenge. Jo screen

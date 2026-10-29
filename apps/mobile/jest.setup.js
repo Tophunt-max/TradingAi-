@@ -1,4 +1,3 @@
-/* eslint-env jest */
 // Minimal Reanimated stand-in covering the APIs this app uses. The package's own
 // mock initialises native CSS handlers that are unavailable under Jest.
 jest.mock('react-native-reanimated', () => {

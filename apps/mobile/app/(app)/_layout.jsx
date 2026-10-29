@@ -2,6 +2,30 @@ import { Stack } from 'expo-router';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { usePreferences } from '../../features/account/api';
 
+const TITLES = {
+  more: 'More',
+  'system-health': 'System Health',
+  'feature/[id]': '',
+  'settings/index': 'Profile & Settings',
+  'settings/security': 'Security',
+  'settings/sessions': 'Active Sessions',
+  'settings/audit': 'Audit History',
+  'instrument/[symbol]': 'Chart & Analysis',
+  'option-chain': 'Option Chain',
+  'bots/new': 'Create Bot',
+  'bots/ai-create': 'AI Auto Create Bot',
+  'bots/builder': 'Manual Bot Builder',
+  'bots/templates': 'Strategy Templates',
+  'bots/[id]': 'Bot Details',
+  orders: 'Orders',
+  positions: 'Positions',
+  'risk-center': 'Risk Management',
+  alerts: 'Notifications',
+  brokers: 'Broker Connections',
+  screener: 'Market Screener',
+  education: 'Learn & Grow',
+};
+
 export default function AppLayout() {
   const theme = useTheme();
   usePreferences(); // hydrate theme / motion / haptics preferences after sign-in
@@ -17,13 +41,9 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="more" options={{ title: 'More' }} />
-      <Stack.Screen name="system-health" options={{ title: 'System Health' }} />
-      <Stack.Screen name="feature/[id]" options={{ title: '' }} />
-      <Stack.Screen name="settings/index" options={{ title: 'Profile & Settings' }} />
-      <Stack.Screen name="settings/security" options={{ title: 'Security' }} />
-      <Stack.Screen name="settings/sessions" options={{ title: 'Active Sessions' }} />
-      <Stack.Screen name="settings/audit" options={{ title: 'Audit History' }} />
+      {Object.entries(TITLES).map(([name, title]) => (
+        <Stack.Screen key={name} name={name} options={{ title }} />
+      ))}
     </Stack>
   );
 }
