@@ -1,5 +1,10 @@
-"""Paper execution: contract selection, order placement, fill sync, positions,
+"""Execution: contract selection, order placement, fill sync, positions,
 exits and reconciliation.
+
+Every order, fill, position and daily risk row belongs to one account and is stamped
+with its (account_id, account_mode). The adapter is chosen by `execution.router` from the
+account row loaded server-side: DEMO -> paper simulator, REAL -> real-broker adapter
+(locked in this build). DEMO fills post to the DEMO cash ledger.
 
 Rules that keep it safe:
 - Every entry passes the global risk manager under a per-user lock.
@@ -22,14 +27,22 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.brokers.base import BrokerError, BrokerOrderState, BrokerUnavailable, OrderRequest
-from app.brokers.paper import PaperBroker
+from app.accounts import core as ACC
+from app.brokers.base import (
+    BrokerError,
+    BrokerOrderState,
+    BrokerUnavailable,
+    ExecutionAdapter,
+    OrderRequest,
+)
 from app.core.config import MarketDataMode, Settings
 from app.core.time import IST
 from app.execution import charges as CH
 from app.execution import risk as RISK
+from app.execution.router import load_account, route_adapter
 from app.execution.state import move
 from app.market_data.provider import MarketDataProvider
+from app.models.accounts import Account
 from app.models.bots import RiskSettings
 from app.models.execution import ACTIVE_ORDER_STATES, Fill, Order, OrderEvent, Position
 
@@ -150,11 +163,22 @@ def _contract_dict(c: dict[str, Any]) -> dict[str, Any]:
                               "tick_size")}
 
 
-def broker_for(db: Session, settings: Settings, user_id: uuid.UUID,
-               cache: ChainCache) -> PaperBroker:
-    return PaperBroker(db, user_id, cache.quote, slippage_ticks=settings.paper_slippage_ticks,
-                       max_spread_pct=settings.paper_max_spread_pct,
-                       max_fill_qty_per_pass=settings.paper_max_fill_qty_per_pass)
+def adapter_for(db: Session, settings: Settings, account: Account | uuid.UUID,
+                cache: ChainCache) -> ExecutionAdapter:
+    """The account's adapter. Accepts an account id so callers holding an order or
+    position always route by the row's own account, never by anything the client sent."""
+    acc = account if isinstance(account, Account) else load_account(db, account)
+    return route_adapter(db, settings, acc, cache.quote)
+
+
+def account_blockers(db: Session, settings: Settings, account: Account,
+                     cache: ChainCache) -> list[str]:
+    """Reasons this account cannot open new positions (before the shared risk checks)."""
+    if account.mode == "REAL":
+        return adapter_for(db, settings, account, cache).blockers()  # type: ignore[attr-defined]
+    if account.status != "ACTIVE":
+        return [f"The demo account is {account.status}."]
+    return []
 
 
 # ------------------------------------------------------------------- levels
@@ -184,9 +208,15 @@ def place_entry(db: Session, settings: Settings, cache: ChainCache, *, user_id: 
                 order_type: str = "MARKET", limit_offset_pct: Decimal = D("0"),
                 bot_id: uuid.UUID | None = None, signal_id: uuid.UUID | None = None,
                 bot_risk_per_trade: Decimal | None = None,
-                bot_square_off: str | None = None) -> Order:
+                bot_square_off: str | None = None, account: Account | None = None) -> Order:
+    account = account or ACC.get_or_create_demo(db, user_id)
+    if account.user_id != user_id:
+        raise ACC.AccountModeMismatch("The account does not belong to this user.")
     existing = db.scalar(select(Order).where(Order.client_order_id == client_order_id))
     if existing is not None:
+        if existing.account_id != account.id:
+            raise ExecutionError("This idempotency key was used in another account.",
+                                 "IDEMPOTENCY_CONFLICT")
         return existing  # idempotent
     rs = RISK.lock_user(db, user_id)
     c = resolve_contract(cache, underlying=underlying, option_type=option_type,
@@ -213,19 +243,22 @@ def place_entry(db: Session, settings: Settings, cache: ChainCache, *, user_id: 
                        brokerage=brokerage) if entry_ref > 0 else None
     buy_ch = D(rt["buy"]["total"]) if rt else D("0")
     decision = RISK.pretrade(
-        db, settings, rs, user_id=user_id, now=now, lots=lots, lot_size=lot,
+        db, settings, rs, account=account, now=now, lots=lots, lot_size=lot,
         entry_price=entry_ref, stop_price=stop_price or entry_ref,
         round_trip_charges=D(rt["total"]["total"]) if rt else D("0"), buy_charges=buy_ch,
         quote_ok=quote_ok and entry_ref > 0,
         quote_detail="No fresh two-sided quote for this contract.", expiry=c["expiry"],
-        bot_id=bot_id, bot_risk_per_trade=bot_risk_per_trade, bot_square_off=bot_square_off)
+        bot_id=bot_id, bot_risk_per_trade=bot_risk_per_trade, bot_square_off=bot_square_off,
+        account_blockers=account_blockers(db, settings, account, cache))
     limit_price = None
     if order_type == "LIMIT" and ask is not None:
         limit_price = (ask * (1 + D(limit_offset_pct) / 100) / tick).to_integral_value(
             rounding=ROUND_FLOOR) * tick
     o = Order(
-        user_id=user_id, bot_id=bot_id, signal_id=signal_id, client_order_id=client_order_id,
-        broker="PAPER", mode="PAPER", purpose="ENTRY", side="BUY", underlying=underlying,
+        user_id=user_id, account_id=account.id, account_mode=account.mode, bot_id=bot_id,
+        signal_id=signal_id, client_order_id=client_order_id,
+        broker=_broker_name(account), mode=_legacy_mode(account), purpose="ENTRY", side="BUY",
+        underlying=underlying,
         trading_symbol=c["trading_symbol"], security_id=c["security_id"], expiry=c["expiry"],
         strike=c["strike"], option_type=option_type, lot_size=lot,
         lot_size_source=c["lot_size_source"], quantity=qty, order_type=order_type,
@@ -245,17 +278,27 @@ def place_entry(db: Session, settings: Settings, cache: ChainCache, *, user_id: 
         move(db, o, "REJECTED", "Risk manager: " + o.reject_reason)
         return o
     move(db, o, "VALIDATED", "All pre-trade risk checks passed.")
-    _submit(db, broker_for(db, settings, user_id, cache), o, _contract_dict(c))
+    _submit(db, adapter_for(db, settings, account, cache), o, _contract_dict(c))
     return o
 
 
-def _submit(db: Session, broker: PaperBroker, o: Order, contract: dict[str, Any]) -> None:
-    move(db, o, "SUBMITTED", "Sent to paper broker.")
+def _broker_name(account: Account) -> str:
+    return "PAPER" if account.mode == "DEMO" else (account.broker or "REAL")[:20]
+
+
+def _legacy_mode(account: Account) -> str:
+    return "PAPER" if account.mode == "DEMO" else "LIVE"
+
+
+def _submit(db: Session, broker: ExecutionAdapter, o: Order, contract: dict[str, Any]) -> None:
+    move(db, o, "SUBMITTED", "Sent to paper broker." if broker.account_mode == "DEMO"
+         else "Sent to the real-broker adapter.")
     try:
-        st = broker.place_order(OrderRequest(
+        st = broker.submit(OrderRequest(
             client_order_id=o.client_order_id, side=o.side,  # type: ignore[arg-type]
             quantity=o.quantity, order_type=o.order_type,  # type: ignore[arg-type]
-            limit_price=o.limit_price, contract=contract))
+            limit_price=o.limit_price, contract=contract, account_id=o.account_id,
+            account_mode=o.account_mode))
     except BrokerError as exc:
         o.reject_reason = str(exc)[:500]
         move(db, o, "REJECTED", f"Broker rejected: {exc}")
@@ -279,9 +322,12 @@ def place_exit(db: Session, settings: Settings, cache: ChainCache, pos: Position
     n = db.scalar(select(func.count()).select_from(Order).where(
         Order.position_id == pos.id, Order.purpose == "EXIT")) or 0
     entry = db.get(Order, pos.entry_order_id)
+    account = load_account(db, pos.account_id)
     o = Order(
-        user_id=pos.user_id, bot_id=pos.bot_id, position_id=pos.id,
-        client_order_id=f"EXIT-{pos.id.hex[:16]}-{n + 1}", broker="PAPER", mode="PAPER",
+        user_id=pos.user_id, account_id=account.id, account_mode=account.mode,
+        bot_id=pos.bot_id, position_id=pos.id,
+        client_order_id=f"EXIT-{pos.id.hex[:16]}-{n + 1}", broker=_broker_name(account),
+        mode=_legacy_mode(account),
         purpose="EXIT", side="SELL", underlying=pos.underlying,
         trading_symbol=pos.trading_symbol, security_id=pos.security_id, expiry=pos.expiry,
         strike=pos.strike, option_type=pos.option_type, lot_size=pos.lot_size,
@@ -295,9 +341,11 @@ def place_exit(db: Session, settings: Settings, cache: ChainCache, pos: Position
     move(db, o, "VALIDATED", "Exits are always allowed by the risk manager.")
     pos.status = "CLOSING"
     tick = D(str((entry.risk_snapshot or {}).get("tick_size", "0.05"))) if entry else D("0.05")
-    _submit(db, broker_for(db, settings, pos.user_id, cache), o, {
+    _submit(db, adapter_for(db, settings, account, cache), o, {
         "underlying": pos.underlying, "expiry": pos.expiry, "strike": pos.strike,
         "option_type": pos.option_type, "security_id": pos.security_id, "tick_size": tick})
+    if o.status == "REJECTED":
+        pos.status = "OPEN"  # the exit never reached a broker; the next pass retries
     return o
 
 
@@ -308,13 +356,17 @@ def _apply_fill(db: Session, settings: Settings, o: Order, fill_id: str, qty: in
                 price: Decimal, ts: datetime, first: bool) -> None:
     ch = CH.compute(side=o.side, price=price, qty=qty, day=RISK.trading_day(ts),
                     brokerage=settings.paper_brokerage_per_order, charge_brokerage=first)
-    ds = RISK.daily_state(db, o.user_id, RISK.trading_day(ts))
+    account = load_account(db, o.account_id)
+    if account.mode != o.account_mode:  # also impossible by the composite FK
+        raise ACC.AccountModeMismatch("Order mode does not match its account.")
+    ds = RISK.daily_state(db, account, RISK.trading_day(ts))
     ds.charges += ch.total
     if o.purpose == "ENTRY":
         pos = db.scalar(select(Position).where(Position.entry_order_id == o.id))
         if pos is None:
             pos = Position(
-                user_id=o.user_id, bot_id=o.bot_id, entry_order_id=o.id, mode=o.mode,
+                user_id=o.user_id, account_id=o.account_id, account_mode=o.account_mode,
+                bot_id=o.bot_id, entry_order_id=o.id, mode=o.mode,
                 underlying=o.underlying, trading_symbol=o.trading_symbol,
                 security_id=o.security_id, expiry=o.expiry, strike=o.strike,
                 option_type=o.option_type, lot_size=o.lot_size, quantity=0, entry_qty=0,
@@ -344,13 +396,24 @@ def _apply_fill(db: Session, settings: Settings, o: Order, fill_id: str, qty: in
             pos.status, pos.closed_at, pos.exit_reason = "CLOSED", ts, o.exit_reason
             if o.exit_reason == "STOP_LOSS":
                 ds.stop_loss_exits += 1
-    db.add(Fill(order_id=o.id, user_id=o.user_id, broker=o.broker,
-                broker_fill_id=fill_id,
+    fill = Fill(order_id=o.id, user_id=o.user_id, account_id=o.account_id,
+                account_mode=o.account_mode, broker=o.broker, broker_fill_id=fill_id,
                 side=o.side, quantity=qty, price=price, ts=ts, charges=ch.as_dict(),
-                charges_total=ch.total))
+                charges_total=ch.total)
+    db.add(fill)
+    db.flush()
+    if account.mode == "DEMO":
+        value = price * qty
+        what = f"{o.side} {qty} {o.trading_symbol} @ {price:.2f}"
+        ACC.post(db, account, "TRADE_BUY" if o.side == "BUY" else "TRADE_SELL",
+                 -value if o.side == "BUY" else value, ref_type="fill", ref_id=str(fill.id),
+                 note=what, ts=ts)
+        if ch.total:
+            ACC.post(db, account, "CHARGES", -ch.total, ref_type="fill", ref_id=str(fill.id),
+                     note=f"Estimated charges: {what}", ts=ts)
 
 
-def sync_order(db: Session, settings: Settings, broker: PaperBroker, o: Order) -> None:
+def sync_order(db: Session, settings: Settings, broker: ExecutionAdapter, o: Order) -> None:
     if not o.broker_order_id:
         return
     st = broker.get_order(o.broker_order_id)
@@ -392,20 +455,20 @@ def cancel(db: Session, settings: Settings, cache: ChainCache, o: Order, reason:
     if o.status not in ("ACKNOWLEDGED", "PARTIALLY_FILLED", "SUBMITTED"):
         return
     move(db, o, "CANCEL_PENDING", reason)
-    broker = broker_for(db, settings, o.user_id, cache)
-    st = broker.cancel_order(o.broker_order_id)  # type: ignore[arg-type]
+    broker = adapter_for(db, settings, o.account_id, cache)
+    st = broker.cancel(o.broker_order_id)  # type: ignore[arg-type]
     _sync_from_state(db, settings, o, st)
 
 
 # ------------------------------------------------------------ reconciliation
 
 
-def reconcile(db: Session, settings: Settings, cache: ChainCache, user_id: uuid.UUID,
+def reconcile(db: Session, settings: Settings, cache: ChainCache, account: Account,
               now: datetime) -> None:
     """Resolve orders whose outcome is unknown by asking the broker. Never resend."""
-    broker = broker_for(db, settings, user_id, cache)
+    broker = adapter_for(db, settings, account, cache)
     for o in db.scalars(select(Order).where(
-            Order.user_id == user_id,
+            Order.account_id == account.id,
             Order.status.in_(("UNKNOWN", "RECONCILIATION_REQUIRED")))).all():
         st = broker.find_by_client_id(o.client_order_id)
         if st is None:
@@ -432,10 +495,10 @@ def demo_24x7(settings: Settings) -> bool:
 
 
 def manage_positions(db: Session, settings: Settings, cache: ChainCache, rs: RiskSettings,
-                     user_id: uuid.UUID, now: datetime) -> None:
+                     account: Account, now: datetime) -> None:
     local = now.astimezone(IST)
-    ds = RISK.daily_state(db, user_id, RISK.trading_day(now))
-    positions = RISK.open_positions(db, user_id)
+    ds = RISK.daily_state(db, account, RISK.trading_day(now))
+    positions = RISK.open_positions(db, account.id)
     for p in positions:
         q = cache.quote({"underlying": p.underlying, "expiry": p.expiry, "strike": p.strike,
                          "option_type": p.option_type})
@@ -453,12 +516,12 @@ def manage_positions(db: Session, settings: Settings, cache: ChainCache, rs: Ris
     day_net = ds.realized_net + RISK.unrealized(positions)
     if ds.loss_limit_hit_at is None and day_net <= -rs.daily_loss_limit:
         ds.loss_limit_hit_at = now
-        _cancel_pending_entries(db, settings, cache, user_id, "Daily loss stop reached.")
+        _cancel_pending_entries(db, settings, cache, account, "Daily loss stop reached.")
     if ds.profit_lock_hit_at is None and ds.realized_net >= rs.daily_profit_lock:
         ds.profit_lock_hit_at = now
-        _cancel_pending_entries(db, settings, cache, user_id, "Daily profit lock reached.")
+        _cancel_pending_entries(db, settings, cache, account, "Daily profit lock reached.")
     if rs.kill_switch_engaged:
-        _cancel_pending_entries(db, settings, cache, user_id, "Kill switch engaged.")
+        _cancel_pending_entries(db, settings, cache, account, "Kill switch engaged.")
     for p in positions:
         if p.status != "OPEN":
             continue
@@ -481,14 +544,14 @@ def manage_positions(db: Session, settings: Settings, cache: ChainCache, rs: Ris
 
 
 def _cancel_pending_entries(db: Session, settings: Settings, cache: ChainCache,
-                            user_id: uuid.UUID, reason: str) -> None:
-    for o in RISK.pending_entries(db, user_id):
+                            account: Account, reason: str) -> None:
+    for o in RISK.pending_entries(db, account.id):
         cancel(db, settings, cache, o, reason)
 
 
 def expire_stale_entries(db: Session, settings: Settings, cache: ChainCache,
-                         user_id: uuid.UUID, now: datetime) -> None:
-    for o in RISK.pending_entries(db, user_id):
+                         account: Account, now: datetime) -> None:
+    for o in RISK.pending_entries(db, account.id):
         if o.order_type == "LIMIT" and now - o.created_at > ENTRY_LIMIT_TTL:
             cancel(db, settings, cache, o, "Entry limit order not filled within 5 minutes.")
 
@@ -496,46 +559,54 @@ def expire_stale_entries(db: Session, settings: Settings, cache: ChainCache,
 # ------------------------------------------------------------------ the pass
 
 
-def users_with_activity(db: Session) -> list[uuid.UUID]:
-    a = db.scalars(select(Order.user_id).where(Order.status.in_(ACTIVE_ORDER_STATES))).all()
-    b = db.scalars(select(Position.user_id).where(Position.status != "CLOSED")).all()
+def accounts_with_activity(db: Session) -> list[uuid.UUID]:
+    a = db.scalars(select(Order.account_id).where(Order.status.in_(ACTIVE_ORDER_STATES))).all()
+    b = db.scalars(select(Position.account_id).where(Position.status != "CLOSED")).all()
     return sorted(set(a) | set(b), key=str)
 
 
-def process_user(db: Session, settings: Settings, cache: ChainCache, user_id: uuid.UUID,
-                 now: datetime) -> None:
-    rs = RISK.lock_user(db, user_id)
-    broker = broker_for(db, settings, user_id, cache)
-    reconcile(db, settings, cache, user_id, now)
-    broker.match(now)
+def process_account(db: Session, settings: Settings, cache: ChainCache, account: Account,
+                    now: datetime) -> None:
+    rs = RISK.lock_user(db, account.user_id)
+    broker = adapter_for(db, settings, account, cache)
+    reconcile(db, settings, cache, account, now)
+    broker.poll(now)
     for o in db.scalars(select(Order).where(
-            Order.user_id == user_id,
+            Order.account_id == account.id,
             Order.status.in_(("SUBMITTED", "ACKNOWLEDGED", "PARTIALLY_FILLED",
                               "CANCEL_PENDING")))).all():
         sync_order(db, settings, broker, o)
-    expire_stale_entries(db, settings, cache, user_id, now)
-    manage_positions(db, settings, cache, rs, user_id, now)
+    expire_stale_entries(db, settings, cache, account, now)
+    manage_positions(db, settings, cache, rs, account, now)
     # Exits placed above fill on this pass too.
-    broker.match(now)
+    broker.poll(now)
     for o in db.scalars(select(Order).where(
-            Order.user_id == user_id, Order.purpose == "EXIT",
+            Order.account_id == account.id, Order.purpose == "EXIT",
             Order.status.in_(("ACKNOWLEDGED", "PARTIALLY_FILLED")))).all():
         sync_order(db, settings, broker, o)
 
 
 def run_pass(db: Session, settings: Settings, provider: MarketDataProvider,
              now: datetime) -> dict[str, int]:
+    """One execution pass over every account with live orders or open positions.
+
+    Only DEMO accounts are processed. REAL accounts are skipped and counted: no verified
+    broker client exists, so the pass must not touch (or "manage") real orders."""
     cache = ChainCache(provider, settings)
-    stats = {"users": 0, "errors": 0}
-    for uid in users_with_activity(db):
+    stats = {"accounts": 0, "errors": 0, "real_skipped": 0}
+    for aid in accounts_with_activity(db):
         try:
-            process_user(db, settings, cache, uid, now)
+            account = load_account(db, aid)
+            if account.mode != "DEMO":
+                stats["real_skipped"] += 1
+                continue
+            process_account(db, settings, cache, account, now)
             db.commit()
-            stats["users"] += 1
+            stats["accounts"] += 1
         except Exception:
             db.rollback()
             stats["errors"] += 1
-            logger.exception("execution_pass_user_failed", extra={"user_id": str(uid)})
+            logger.exception("execution_pass_account_failed", extra={"account_id": str(aid)})
     return stats
 
 
@@ -544,7 +615,7 @@ def fill_now(db: Session, settings: Settings, cache: ChainCache, o: Order,
     """Match immediately after placing (paper fills are near-instant)."""
     if o.status not in ("ACKNOWLEDGED", "PARTIALLY_FILLED"):
         return
-    broker = broker_for(db, settings, o.user_id, cache)
-    broker.match(now)
+    broker = adapter_for(db, settings, o.account_id, cache)
+    broker.poll(now)
     sync_order(db, settings, broker, o)
 

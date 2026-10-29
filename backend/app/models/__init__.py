@@ -1,5 +1,6 @@
 """Import all models so Alembic autogenerate and metadata.create_all see them."""
 
+from app.models.accounts import Account, LedgerEntry, LiveAuthorization
 from app.models.audit import AuditLog
 from app.models.auth import (
     RefreshToken,
@@ -35,6 +36,9 @@ from app.models.ml import ModelVersion, Prediction
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
+    "Account",
+    "LedgerEntry",
+    "LiveAuthorization",
     "AuditLog",
     "ModelVersion",
     "Prediction",

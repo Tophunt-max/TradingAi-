@@ -29,7 +29,7 @@ def live_blockers(mode: MarketDataMode) -> list[str]:
     return [
         "No verified broker order adapter is integrated.",
         data,
-        "Global risk manager and order state machine are not implemented yet.",
+        "The real-account execution adapter is locked: no verified broker client exists.",
         "Explicit user authorisation for live trading has not been granted.",
     ]
 

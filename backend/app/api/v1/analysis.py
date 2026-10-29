@@ -75,6 +75,8 @@ class AnalysisPayload(Provenance):
     decision: Literal["NO_TRADE", "TRADE_PROPOSAL"]
     abstain_reasons: list[str]
     explanation: list[str]
+    technical: dict[str, Any] | None = None
+    indicator_version: str | None = None
 
 
 def _candles(provider: Any, symbol: str, timeframe: str, limit: int = WINDOW) -> Any:

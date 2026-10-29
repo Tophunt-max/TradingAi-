@@ -13,6 +13,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.accounts import core as ACC
 from app.api.deps import AuthDep, DbDep
 from app.models.audit import AuditLog
 from app.models.bots import Bot, BotEvent, BotRun, BotSignal
@@ -49,6 +50,10 @@ class AlertOut(BaseModel):
     title: str
     body: str | None
     created_at: datetime
+
+
+def _kind(o: Order) -> str:
+    return "Paper" if o.account_mode == "DEMO" else "Live"
 
 
 @router.get("/alerts", response_model=list[AlertOut])
@@ -102,19 +107,21 @@ def alerts(
         out += [AlertOut(id=str(e.id), category="BOTS", severity="warning",
                          title=f"Bot error: {name}", body=e.message, created_at=e.ts)
                 for e, name in errs]
+    # Trade and risk alerts come from the active account only (never mixed across modes).
+    active = ACC.active_mode(db, ctx.user.id)
     if category in (None, "TRADES"):
         rows_o = db.scalars(
-            select(Order).where(Order.user_id == ctx.user.id,
+            select(Order).where(Order.user_id == ctx.user.id, Order.account_mode == active,
                                 Order.status.in_(("FILLED", "REJECTED", "RECONCILIATION_REQUIRED")))
             .order_by(Order.updated_at.desc()).limit(limit)).all()
         for o in rows_o:
             if o.status == "FILLED":
-                title = f"Paper {o.side} filled: {o.trading_symbol}"
+                title = f"{_kind(o)} {o.side} filled: {o.trading_symbol}"
                 body = f"{o.filled_qty} @ {o.avg_fill_price:.2f}" + (
                     f" · exit: {o.exit_reason}" if o.exit_reason else "")
                 sev: str = "info"
             elif o.status == "REJECTED":
-                title, body, sev = (f"Paper {o.side} rejected: {o.trading_symbol}",
+                title, body, sev = (f"{_kind(o)} {o.side} rejected: {o.trading_symbol}",
                                     o.reject_reason, "warning")
             else:
                 title, body, sev = (f"Order needs reconciliation: {o.trading_symbol}",
@@ -123,7 +130,8 @@ def alerts(
                                 title=title, body=body,
                                 created_at=o.terminal_at or o.updated_at))
     if category in (None, "RISK"):
-        for ds in db.scalars(select(DailyRiskState).where(DailyRiskState.user_id == ctx.user.id)
+        for ds in db.scalars(select(DailyRiskState).where(DailyRiskState.user_id == ctx.user.id,
+                                                          DailyRiskState.account_mode == active)
                              .order_by(DailyRiskState.trading_day.desc()).limit(10)).all():
             if ds.loss_limit_hit_at:
                 out.append(AlertOut(id=f"loss-{ds.id}", category="RISK", severity="critical",

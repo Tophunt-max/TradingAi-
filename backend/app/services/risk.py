@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.time import utcnow
+from app.models.accounts import Account
 from app.models.bots import Bot, RiskSettings
 from app.schemas.risk import RiskLimitsOut, RiskLimitsUpdate, RiskStatus, RiskUsage
 
@@ -57,30 +58,35 @@ def set_kill_switch(rs: RiskSettings, engaged: bool) -> None:
 
 
 def status(rs: RiskSettings, db: Session | None = None, settings: Settings | None = None,
-           ) -> RiskStatus:
+           account: Account | None = None, account_mode: str = "DEMO",
+           account_reasons: list[str] | None = None) -> RiskStatus:
+    """Shared limits (per user) with usage of ONE account (per account mode)."""
     from app.execution import risk as RISK
 
     zero = Decimal("0")
+    mode = "PAPER" if account_mode == "DEMO" else "LIVE"
     if db is None:
         usage = RiskUsage(realized_pnl=zero, unrealized_pnl=zero, estimated_charges=zero,
                           entries_used=0, open_positions=0, planned_risk=zero,
                           daily_loss_used_pct=0.0, profit_lock_reached=False)
-        return RiskStatus(mode="PAPER", engine_active=False, engine_note=ENGINE_NOTE,
+        return RiskStatus(mode=mode, account_mode=account_mode, engine_active=False,
+                          engine_note=ENGINE_NOTE,
                           limits=RiskLimitsOut.model_validate(rs), usage=usage,
                           new_entries_allowed=False, block_reasons=[], disclaimer=DISCLAIMER,
                           exposure=[])
     now = utcnow()
-    ds = RISK.daily_state(db, rs.user_id, RISK.trading_day(now))
-    pos = RISK.open_positions(db, rs.user_id)
-    pend = RISK.pending_entries(db, rs.user_id)
+    ds = RISK.peek_daily_state(db, account, RISK.trading_day(now))
+    aid = account.id if account is not None else None
+    pos = RISK.open_positions(db, aid)
+    pend = RISK.pending_entries(db, aid)
     unreal = RISK.unrealized(pos)
     planned = sum(((p.avg_entry - (p.stop_price or p.avg_entry)) * p.quantity for p in pos),
                   zero)
     day_net = ds.realized_net + unreal
     used_pct = float(max(-day_net, zero) / rs.daily_loss_limit * 100) if rs.daily_loss_limit \
         else 0.0
-    reasons = []
-    if settings is not None and not settings.paper_trading_enabled:
+    reasons = list(account_reasons or [])
+    if account_mode == "DEMO" and settings is not None and not settings.paper_trading_enabled:
         reasons.append("Paper trading is disabled.")
     if rs.kill_switch_engaged:
         reasons.append("Kill switch is engaged.")
@@ -93,7 +99,7 @@ def status(rs: RiskSettings, db: Session | None = None, settings: Settings | Non
         reasons.append(f"All {rs.max_entries_per_day} entries for today are used.")
     if len(pos) + len(pend) >= rs.max_open_positions:
         reasons.append("Maximum open positions reached.")
-    if RISK.unresolved_orders(db, rs.user_id):
+    if RISK.unresolved_orders(db, aid):
         reasons.append("An order needs reconciliation.")
     by_bot: dict[str, dict[str, Any]] = {}
 
@@ -122,7 +128,9 @@ def status(rs: RiskSettings, db: Session | None = None, settings: Settings | Non
     if len(pos) > 1 and len(correlated) < len(pos):
         reasons.append("Several open positions share the same underlying (correlated).")
     return RiskStatus(
-        mode="PAPER", engine_active=bool(settings is None or settings.paper_trading_enabled),
+        mode=mode, account_mode=account_mode,
+        engine_active=account_mode == "DEMO"
+        and bool(settings is None or settings.paper_trading_enabled),
         engine_note=ENGINE_NOTE, limits=RiskLimitsOut.model_validate(rs),
         usage=RiskUsage(realized_pnl=ds.realized_net, unrealized_pnl=unreal,
                         estimated_charges=ds.charges, entries_used=ds.entries + len(pend),

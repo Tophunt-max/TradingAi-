@@ -9,7 +9,7 @@ export const FEATURES = {
   alerts: { title: 'Notifications', icon: 'notifications-outline', phase: 5, route: '/alerts', summary: 'Bot, risk and security events.' },
   brokers: { title: 'Broker Connections', icon: 'link-outline', phase: 7, route: '/brokers', summary: 'Paper adapter and planned broker integrations.' },
   education: { title: 'Learn & Grow', icon: 'school-outline', phase: 4, route: '/education', summary: 'Strategies, indicators, risk and glossary.' },
-  backtesting: { title: 'Backtesting Lab', icon: 'time-outline', phase: 8, summary: 'Event-driven backtests, walk-forward tests and Monte Carlo analysis without lookahead.' },
+  backtesting: { title: 'Backtesting Lab', icon: 'time-outline', phase: 8, route: '/backtesting', summary: 'Event-driven backtests, walk-forward tests and Monte Carlo analysis without lookahead.' },
   'model-lab': { title: 'AI Model Lab', icon: 'git-network-outline', phase: 4, route: '/models', summary: 'Model registry, walk-forward metrics, promotion gate and prediction history.' },
   reports: { title: 'Reports', icon: 'document-text-outline', phase: 8, summary: 'Daily and weekly performance, charges, slippage and CSV export.' },
   'ai-analysis': { title: 'AI Market Analysis', icon: 'sparkles-outline', phase: 4, route: '/ai-lab', summary: 'Probabilities with calibration, uncertainty and NO TRADE.' },

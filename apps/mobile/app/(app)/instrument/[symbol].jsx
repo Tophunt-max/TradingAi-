@@ -5,6 +5,7 @@ import { AppText, Badge, Button, Card, Chip, ChipRow, DataSourceBadge, NoticeBan
 import { CandleChart, IndicatorPanel } from '../../../components/charts/CandleChart';
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { BIAS_TONE } from '../../../features/ai/Sections';
+import { patternContextLine, patternStatus } from '../../../features/ai/evidence';
 import { useCandles, useQuotes } from '../../../features/market/api';
 import { QualityBanner } from '../../../features/market/QualityBanner';
 import { mapAnnotations } from '../../../features/market/annotations';
@@ -19,11 +20,12 @@ export default function Instrument() {
   const symbol = String(raw).toUpperCase();
   const theme = useTheme();
   const [tf, setTf] = useState('5m');
-  const [overlay, setOverlay] = useState({ ema: true, bb: false, vwap: false, st: false, smc: true });
+  const [overlay, setOverlay] = useState({ ema: true, ema100: false, bb: false, vwap: false, avwap: false, st: false, smc: true });
   const [panel, setPanel] = useState('rsi');
   const indicators = [
     'ema9', 'ema21', 'rsi14', 'macd', 'adx14', 'stoch',
     overlay.bb ? 'bb20' : null, overlay.vwap ? 'vwap' : null, overlay.st ? 'supertrend' : null,
+    overlay.ema100 ? 'ema100' : null, overlay.avwap ? 'avwap' : null,
   ].filter(Boolean).join(',');
   const quote = useQuotes('ALL', symbol);
   const candles = useCandles(symbol, tf, indicators, 80, overlay.smc);
@@ -72,6 +74,8 @@ export default function Instrument() {
                   {overlay.bb ? <AppText variant="caption" style={{ color: s[2] }}>BB 20, 2</AppText> : null}
                   {overlay.vwap ? <AppText variant="caption" style={{ color: s[3] }}>VWAP</AppText> : null}
                   {overlay.st ? <AppText variant="caption" style={{ color: s[4] }}>Supertrend</AppText> : null}
+                  {overlay.ema100 ? <AppText variant="caption" style={{ color: s[2] }}>EMA 100</AppText> : null}
+                  {overlay.avwap ? <AppText variant="caption" style={{ color: s[3] }}>AVWAP (last swing)</AppText> : null}
                   <AppText variant="caption" tone="faint">{d.provider} · closed candles · {formatIST(d.as_of)} IST</AppText>
                 </View>
                 {d.notes?.filter((n) => n.includes('proxy')).map((n) => (
@@ -89,6 +93,8 @@ export default function Instrument() {
                     ...(overlay.bb && ind.bb_upper ? [{ key: 'bbu', values: ind.bb_upper, color: s[2] }, { key: 'bbl', values: ind.bb_lower, color: s[2] }] : []),
                     ...(overlay.vwap && ind.vwap ? [{ key: 'vwap', values: ind.vwap, color: s[3] }] : []),
                     ...(overlay.st && ind.supertrend ? [{ key: 'st', values: ind.supertrend, color: s[4] }] : []),
+                    ...(overlay.ema100 && ind.ema100 ? [{ key: 'ema100', values: ind.ema100, color: s[2] }] : []),
+                    ...(overlay.avwap && ind.avwap ? [{ key: 'avwap', values: ind.avwap, color: s[3] }] : []),
                   ]}
                 />
                 <AppText variant="caption" tone="muted">
@@ -112,12 +118,20 @@ export default function Instrument() {
                 {recent.length ? (
                   <View style={{ gap: 4 }} testID="chart-events">
                     <AppText variant="label" tone="muted">RECENT CONFIRMED EVENTS</AppText>
-                    {recent.map((e, i) => (
-                      <View key={`${e.name}-${e.confirmed_ts}-${i}`} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                        <Badge label={e.direction} tone={BIAS_TONE[e.direction]} />
-                        <AppText variant="caption" style={{ flex: 1 }} numberOfLines={1}>{e.name} · {formatIST(e.confirmed_ts)}</AppText>
-                      </View>
-                    ))}
+                    {recent.map((e, i) => {
+                      const status = patternStatus(e);
+                      const ctx = patternContextLine(e);
+                      return (
+                        <View key={`${e.name}-${e.confirmed_ts}-${i}`} style={{ gap: 2 }}>
+                          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                            <Badge label={e.direction} tone={BIAS_TONE[e.direction]} />
+                            <AppText variant="caption" style={{ flex: 1 }} numberOfLines={1}>{e.name} · {formatIST(e.confirmed_ts)}</AppText>
+                            {status ? <Badge label={status.label} tone={status.tone} /> : null}
+                          </View>
+                          {ctx ? <AppText variant="caption" tone="faint" numberOfLines={1}>{ctx}</AppText> : null}
+                        </View>
+                      );
+                    })}
                   </View>
                 ) : null}
               </View>
@@ -131,6 +145,8 @@ export default function Instrument() {
         <Chip label="Bollinger" selected={overlay.bb} onPress={() => toggle('bb')} />
         <Chip label="VWAP" selected={overlay.vwap} onPress={() => toggle('vwap')} />
         <Chip label="Supertrend" selected={overlay.st} onPress={() => toggle('st')} />
+        <Chip label="EMA 100" selected={overlay.ema100} onPress={() => toggle('ema100')} />
+        <Chip label="AVWAP" selected={overlay.avwap} onPress={() => toggle('avwap')} />
         <Chip label="Patterns & SMC" selected={overlay.smc} onPress={() => toggle('smc')} testID="toggle-smc" />
       </View>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
@@ -148,7 +164,7 @@ export default function Instrument() {
         ) : null}
       </View>
       <AppText variant="caption" tone="faint">
-        Triangles mark confirmed patterns at the candle that confirmed them. Shaded boxes are fair value gaps and order blocks until price trades back into them.
+        Triangles mark patterns at the candle that completed them; UNCONFIRMED patterns still need a close beyond their high or low. AVWAP is anchored at the latest confirmed swing and starts only once that swing was confirmed. Shaded boxes are fair value gaps and order blocks until price trades back into them.
       </AppText>
     </Screen>
   );

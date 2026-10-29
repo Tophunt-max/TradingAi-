@@ -1,4 +1,8 @@
-"""Paper portfolio: orders, positions, tradebook, charges and the charges calculator."""
+"""Portfolio: orders, positions, tradebook, charges and the charges calculator.
+
+Every endpoint is scoped to ONE account: the `account_mode` query parameter, defaulting to
+the user's active mode. DEMO responses never include REAL rows and vice versa. Writes in
+REAL mode are refused while live trading is locked."""
 
 from __future__ import annotations
 
@@ -12,8 +16,9 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 
+from app.accounts import core as ACC
 from app.api.deps import AuthDep, DbDep, SettingsDep
 from app.core.errors import AppError, NotFoundError
 from app.core.time import IST, utcnow
@@ -21,6 +26,7 @@ from app.execution import charges as CH
 from app.execution import risk as RISK
 from app.execution import service as EX
 from app.market_data.factory import ProviderDep, provider_errors
+from app.models.accounts import Account
 from app.models.execution import ACTIVE_ORDER_STATES, Fill, Order, OrderEvent, Position
 from app.schemas.common import Page
 from app.services import risk as risk_svc
@@ -29,14 +35,43 @@ from app.services.audit import record_audit
 router = APIRouter(tags=["portfolio"])
 D = Decimal
 
+ModeQuery = Annotated[Literal["DEMO", "REAL"] | None,
+                      Query(description="Account to read; defaults to the active mode.")]
+
+
+def scope(db: DbDep, user_id: uuid.UUID, mode: str | None) -> tuple[str, Account | None]:
+    return ACC.resolve(db, user_id, mode)
+
+
+def _no_rows() -> Any:
+    return false()  # REAL not connected: no rows can belong to it
+
+
+def require_tradeable(db: DbDep, settings: SettingsDep, account: Account | None,
+                      mode: str) -> Account:
+    """Writes need an account that may trade. REAL is refused before any order exists."""
+    if account is None or account.mode == "REAL":
+        from app.services.accounts import real_unavailable_reasons
+
+        reasons = real_unavailable_reasons(db, settings, account)
+        raise AppError("Live trading is locked: " + " ".join(reasons[:2]),
+                       code="LIVE_TRADING_LOCKED", status_code=409,
+                       details={"account_mode": mode, "reasons": reasons})
+    return account
+
 
 class PortfolioSummary(BaseModel):
-    mode: Literal["PAPER"]
+    mode: Literal["PAPER", "LIVE"]
+    account_mode: Literal["DEMO", "REAL"]
+    account_id: str | None
     engine_active: bool
     note: str
     data_source: str | None
-    capital: Decimal
-    available_funds: Decimal
+    # DEMO: virtual opening balance. REAL: null (balances come only from a broker).
+    capital: Decimal | None
+    cash: Decimal | None
+    equity: Decimal | None
+    available_funds: Decimal | None
     used_margin: Decimal
     realized_pnl_today: Decimal
     gross_pnl_today: Decimal
@@ -54,6 +89,7 @@ class PortfolioSummary(BaseModel):
 
 class OrderOut(BaseModel):
     id: str
+    account_mode: str
     client_order_id: str
     broker_order_id: str | None
     bot_id: str | None
@@ -107,6 +143,7 @@ class OrderDetail(OrderOut):
 
 class PositionOut(BaseModel):
     id: str
+    account_mode: str
     bot_id: str | None
     instrument: str
     underlying: str
@@ -136,7 +173,8 @@ class PositionOut(BaseModel):
 
 def _order_out(o: Order) -> dict[str, Any]:
     return dict(
-        id=str(o.id), client_order_id=o.client_order_id, broker_order_id=o.broker_order_id,
+        id=str(o.id), account_mode=o.account_mode, client_order_id=o.client_order_id,
+        broker_order_id=o.broker_order_id,
         bot_id=str(o.bot_id) if o.bot_id else None, purpose=o.purpose,
         instrument=o.trading_symbol, underlying=o.underlying, expiry=o.expiry, strike=o.strike,
         option_type=o.option_type, side=o.side, quantity=D(o.quantity),
@@ -151,7 +189,8 @@ def _pos_out(p: Position) -> PositionOut:
     unreal = (p.last_price - p.avg_entry) * p.quantity if p.last_price is not None and \
         p.quantity else None
     return PositionOut(
-        id=str(p.id), bot_id=str(p.bot_id) if p.bot_id else None, instrument=p.trading_symbol,
+        id=str(p.id), account_mode=p.account_mode, bot_id=str(p.bot_id) if p.bot_id else None,
+        instrument=p.trading_symbol,
         underlying=p.underlying, expiry=p.expiry, strike=p.strike, option_type=p.option_type,
         status=p.status, quantity=D(p.quantity), lots=p.entry_qty // p.lot_size,
         entry_qty=p.entry_qty, avg_price=p.avg_entry, avg_exit=p.avg_exit, ltp=p.last_price,
@@ -162,23 +201,32 @@ def _pos_out(p: Position) -> PositionOut:
 
 
 @router.get("/portfolio", response_model=PortfolioSummary)
-def summary(ctx: AuthDep, db: DbDep) -> PortfolioSummary:
+def summary(ctx: AuthDep, db: DbDep, account_mode: ModeQuery = None) -> PortfolioSummary:
     rs = risk_svc.get_or_create(db, ctx.user.id)
-    ds = RISK.daily_state(db, ctx.user.id, RISK.trading_day(utcnow()))
-    acct = RISK.account(db, rs, ctx.user.id)
-    pos = RISK.open_positions(db, ctx.user.id)
+    mode, acc = scope(db, ctx.user.id, account_mode)
+    ds = RISK.peek_daily_state(db, acc, RISK.trading_day(utcnow()))
+    zero = D("0")
+    f: dict[str, Any] = RISK.funds(db, acc) if acc is not None else {
+        "opening_balance": None, "cash": None, "available": None, "equity": None,
+        "realized_net_total": zero, "used_margin": zero, "reserved": zero, "unrealized": zero}
+    pos = RISK.open_positions(db, acc.id if acc else None)
     db.commit()
-    src = db.scalar(select(Position.data_source).where(Position.user_id == ctx.user.id)
-                    .order_by(Position.opened_at.desc()).limit(1))
+    src = db.scalar(select(Position.data_source).where(
+        Position.account_id == (acc.id if acc else None))
+        .order_by(Position.opened_at.desc()).limit(1))
+    note = ("Simulated DEMO account with virtual money. Fills, charges and P&L are simulated "
+            "and never mixed with real results." if mode == "DEMO" else
+            "Real account: balances, orders and positions come only from a verified broker. "
+            + ("Not connected." if acc is None else "No broker snapshot is available."))
     return PortfolioSummary(
-        mode="PAPER", engine_active=True,
-        note="Simulated paper account. Fills, charges and P&L are simulated and never mixed "
-             "with live results.",
-        data_source=src, capital=rs.capital, available_funds=acct["available"],
-        used_margin=acct["used_margin"] + acct["reserved"],
+        mode="PAPER" if mode == "DEMO" else "LIVE", account_mode=mode,  # type: ignore[arg-type]
+        account_id=str(acc.id) if acc else None, engine_active=mode == "DEMO",
+        note=note, data_source=src, capital=f["opening_balance"], cash=f["cash"],
+        equity=f["equity"], available_funds=f["available"],
+        used_margin=f["used_margin"] + f["reserved"],
         realized_pnl_today=ds.realized_net, gross_pnl_today=ds.realized_gross,
-        unrealized_pnl=acct["unrealized"],
-        total_net_pnl=acct["realized_net_total"] + acct["unrealized"],
+        unrealized_pnl=f["unrealized"],
+        total_net_pnl=f["realized_net_total"] + f["unrealized"],
         charges_today=ds.charges, trades_today=ds.entries,
         max_entries_per_day=rs.max_entries_per_day, open_positions=len(pos),
         daily_loss_limit=rs.daily_loss_limit, daily_profit_lock=rs.daily_profit_lock,
@@ -200,8 +248,12 @@ def orders(
     bot_id: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
+    account_mode: ModeQuery = None,
 ) -> Page[OrderOut]:
-    stmt = select(Order).where(Order.user_id == ctx.user.id)
+    _, acc = scope(db, ctx.user.id, account_mode)
+    db.commit()
+    stmt = select(Order).where(Order.user_id == ctx.user.id,
+                               Order.account_id == acc.id if acc else _no_rows())
     if status:
         stmt = stmt.where(Order.status.in_(_STATUS_GROUPS[status]))
     if bot_id:
@@ -212,9 +264,12 @@ def orders(
                 offset=offset)
 
 
-def _owned_order(db: DbDep, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
+def _owned_order(db: DbDep, user_id: uuid.UUID, order_id: uuid.UUID,
+                 mode: str | None = None) -> Order:
+    """The user's order, only if it belongs to the requested (or active) account mode."""
     o = db.get(Order, order_id)
-    if o is None or o.user_id != user_id:
+    mode = mode or ACC.active_mode(db, user_id)
+    if o is None or o.user_id != user_id or o.account_mode != mode:
         raise NotFoundError("Order not found.")
     return o
 
@@ -235,8 +290,9 @@ def _detail(db: DbDep, o: Order) -> OrderDetail:
 
 
 @router.get("/orders/{order_id}", response_model=OrderDetail)
-def order_detail(order_id: uuid.UUID, ctx: AuthDep, db: DbDep) -> OrderDetail:
-    return _detail(db, _owned_order(db, ctx.user.id, order_id))
+def order_detail(order_id: uuid.UUID, ctx: AuthDep, db: DbDep,
+                 account_mode: ModeQuery = None) -> OrderDetail:
+    return _detail(db, _owned_order(db, ctx.user.id, order_id, account_mode))
 
 
 class ManualEntry(BaseModel):
@@ -253,8 +309,17 @@ class ManualEntry(BaseModel):
 
 @router.post("/orders/paper", response_model=OrderDetail, status_code=201)
 def manual_entry(body: ManualEntry, ctx: AuthDep, db: DbDep, settings: SettingsDep,
-                 provider: ProviderDep, request: Request) -> OrderDetail:
-    """Manual paper BUY of one option contract. Goes through the same risk manager."""
+                 provider: ProviderDep, request: Request,
+                 account_mode: ModeQuery = None) -> OrderDetail:
+    """Manual BUY of one option contract in the active (DEMO) account. Goes through the same
+    risk manager. REAL is refused with 409 while live trading is locked."""
+    mode, acc = scope(db, ctx.user.id, account_mode)
+    if mode != "DEMO":
+        record_audit(db, action="order.manual_entry", user_id=ctx.user.id, request=request,
+                     outcome="REJECTED", details={"account_mode": mode,
+                                                  "reason": "live_trading_locked"})
+        db.commit()
+    acc = require_tradeable(db, settings, acc, mode)
     now = utcnow()
     cache = EX.ChainCache(provider, settings)
     try:
@@ -268,22 +333,26 @@ def manual_entry(body: ManualEntry, ctx: AuthDep, db: DbDep, settings: SettingsD
                 trailing={"type": "PERCENT", "value": str(body.trailing_pct)}
                 if body.trailing_pct else None,
                 client_order_id=f"MAN-{ctx.user.id.hex[:8]}-{body.idempotency_key}",
-                lots=body.lots, strike=body.strike, expiry=body.expiry)
+                lots=body.lots, strike=body.strike, expiry=body.expiry, account=acc)
             EX.fill_now(db, settings, cache, o, now)
     except EX.ExecutionError as exc:
         db.rollback()
         raise AppError(exc.message, code=exc.code, status_code=422) from exc
     record_audit(db, action="order.manual_entry", user_id=ctx.user.id, request=request,
                  entity_type="order", entity_id=str(o.id),
-                 details={"status": o.status, "symbol": o.trading_symbol})
+                 details={"status": o.status, "symbol": o.trading_symbol,
+                          "account_mode": o.account_mode})
     db.commit()
     return _detail(db, o)
 
 
 @router.post("/orders/{order_id}/cancel", response_model=OrderDetail)
 def cancel_order(order_id: uuid.UUID, ctx: AuthDep, db: DbDep, settings: SettingsDep,
-                 provider: ProviderDep, request: Request) -> OrderDetail:
-    o = _owned_order(db, ctx.user.id, order_id)
+                 provider: ProviderDep, request: Request,
+                 account_mode: ModeQuery = None) -> OrderDetail:
+    o = _owned_order(db, ctx.user.id, order_id, account_mode)
+    if o.account_mode != "DEMO":
+        require_tradeable(db, settings, db.get(Account, o.account_id), o.account_mode)
     if o.status not in ("ACKNOWLEDGED", "PARTIALLY_FILLED", "SUBMITTED"):
         raise AppError(f"An order that is {o.status} cannot be cancelled.",
                        code="ORDER_NOT_CANCELLABLE", status_code=409)
@@ -301,8 +370,12 @@ def positions(
     bot_id: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
+    account_mode: ModeQuery = None,
 ) -> Page[PositionOut]:
-    stmt = select(Position).where(Position.user_id == ctx.user.id)
+    _, acc = scope(db, ctx.user.id, account_mode)
+    db.commit()
+    stmt = select(Position).where(Position.user_id == ctx.user.id,
+                                  Position.account_id == acc.id if acc else _no_rows())
     stmt = stmt.where(Position.status == "CLOSED") if state == "CLOSED" else \
         stmt.where(Position.status != "CLOSED")
     if bot_id:
@@ -315,10 +388,14 @@ def positions(
 
 @router.post("/positions/{position_id}/exit", response_model=PositionOut)
 def exit_position(position_id: uuid.UUID, ctx: AuthDep, db: DbDep, settings: SettingsDep,
-                  provider: ProviderDep, request: Request) -> PositionOut:
+                  provider: ProviderDep, request: Request,
+                  account_mode: ModeQuery = None) -> PositionOut:
     p = db.get(Position, position_id)
-    if p is None or p.user_id != ctx.user.id:
+    mode = account_mode or ACC.active_mode(db, ctx.user.id)
+    if p is None or p.user_id != ctx.user.id or p.account_mode != mode:
         raise NotFoundError("Position not found.")
+    if p.account_mode != "DEMO":
+        require_tradeable(db, settings, db.get(Account, p.account_id), p.account_mode)
     if p.status == "CLOSED":
         raise AppError("Position is already closed.", code="POSITION_CLOSED", status_code=409)
     now = utcnow()
@@ -334,30 +411,37 @@ def exit_position(position_id: uuid.UUID, ctx: AuthDep, db: DbDep, settings: Set
 
 
 @router.get("/trades.csv")
-def trades_csv(ctx: AuthDep, db: DbDep) -> StreamingResponse:
-    rows = db.scalars(select(Position).where(Position.user_id == ctx.user.id,
-                                             Position.status == "CLOSED")
-                      .order_by(Position.closed_at)).all()
+def trades_csv(ctx: AuthDep, db: DbDep, account_mode: ModeQuery = None) -> StreamingResponse:
+    mode, acc = scope(db, ctx.user.id, account_mode)
+    db.commit()
+    rows = db.scalars(select(Position).where(
+        Position.user_id == ctx.user.id, Position.account_id == acc.id if acc else _no_rows(),
+        Position.status == "CLOSED").order_by(Position.closed_at)).all()
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["mode", "data_source", "instrument", "qty", "entry_time_ist", "avg_entry",
-                "exit_time_ist", "avg_exit", "gross_pnl", "charges", "net_pnl", "exit_reason",
-                "bot_id"])
+    w.writerow(["mode", "account_mode", "data_source", "instrument", "qty", "entry_time_ist",
+                "avg_entry", "exit_time_ist", "avg_exit", "gross_pnl", "charges", "net_pnl",
+                "exit_reason", "bot_id"])
     for p in rows:
-        w.writerow(["PAPER", p.data_source, p.trading_symbol, p.entry_qty,
+        w.writerow(["PAPER" if p.account_mode == "DEMO" else "LIVE", p.account_mode,
+                    p.data_source, p.trading_symbol, p.entry_qty,
                     p.opened_at.astimezone(IST).isoformat(timespec="seconds"), p.avg_entry,
                     p.closed_at.astimezone(IST).isoformat(timespec="seconds") if p.closed_at
                     else "", p.avg_exit, p.realized_gross, p.charges_total, p.realized_net,
                     p.exit_reason, p.bot_id or ""])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition":
-                                      "attachment; filename=quantai-paper-trades.csv"})
+                                      f"attachment; filename=quantai-{mode.lower()}-trades.csv"})
 
 
 @router.get("/portfolio/charges")
 def charges_breakdown(ctx: AuthDep, db: DbDep,
-                      day: Annotated[date | None, Query()] = None) -> dict[str, Any]:
-    q = select(Fill).where(Fill.user_id == ctx.user.id)
+                      day: Annotated[date | None, Query()] = None,
+                      account_mode: ModeQuery = None) -> dict[str, Any]:
+    mode, acc = scope(db, ctx.user.id, account_mode)
+    db.commit()
+    q = select(Fill).where(Fill.user_id == ctx.user.id,
+                           Fill.account_id == acc.id if acc else _no_rows())
     if day:
         start = datetime.combine(day, time(0), IST)
         q = q.where(Fill.ts >= start, Fill.ts < start + timedelta(days=1))
@@ -368,7 +452,8 @@ def charges_breakdown(ctx: AuthDep, db: DbDep,
         for k, v in f.charges.items():
             if k != "schedule_id":
                 total[k] = total.get(k, D("0")) + D(v)
-    return {"fills": n, "breakdown": {k: str(v) for k, v in total.items()},
+    return {"account_mode": mode, "fills": n,
+            "breakdown": {k: str(v) for k, v in total.items()},
             "note": "Estimated from versioned schedules; reconcile with broker contract notes."}
 
 

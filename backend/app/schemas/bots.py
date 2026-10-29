@@ -135,6 +135,8 @@ class BotConfig(ApiModel):
     filters: FilterSpec = Field(default_factory=FilterSpec)
     notifications: NotificationSpec = Field(default_factory=NotificationSpec)
     mode: Literal["PAPER"] = "PAPER"
+    # Account the bot trades in. REAL bots cannot start while live trading is locked.
+    account_mode: Literal["DEMO", "REAL"] = "DEMO"
 
     @field_validator("strategy_id")
     @classmethod
@@ -165,6 +167,7 @@ class BotRunOut(ApiModel):
     id: uuid.UUID
     config_version: int
     mode: str
+    account_mode: str
     status: str
     started_at: datetime
     ended_at: datetime | None
@@ -212,6 +215,7 @@ class BotOut(ApiModel):
     creation_method: BotCreationMethod
     status: BotStatus
     mode: TradingMode
+    account_mode: str = "DEMO"
     current_version: int
     created_at: datetime
     updated_at: datetime

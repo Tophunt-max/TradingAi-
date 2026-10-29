@@ -1,4 +1,7 @@
-"""Paper-trading broker simulator.
+"""Paper execution adapter: the broker simulator for DEMO accounts.
+
+It refuses any account or order whose mode is not DEMO (`AdapterAccountMismatch`), and the
+schema backs this up: paper_broker_* rows are CHECKed to account_mode = 'DEMO'.
 
 Keeps its own ledger (paper_broker_orders / paper_broker_fills) so the
 execution layer reconciles against it exactly as it would against a real
@@ -26,6 +29,7 @@ from app.brokers.base import (
     BrokerError,
     BrokerFill,
     BrokerOrderState,
+    ExecutionAdapter,
     OrderRequest,
 )
 from app.core.time import utcnow
@@ -40,14 +44,17 @@ def _tick_round(price: Decimal, tick: Decimal, up: bool) -> Decimal:
     return max(steps * tick, tick)
 
 
-class PaperBroker:
+class PaperExecutionAdapter(ExecutionAdapter):
     name = "PAPER"
+    account_mode = "DEMO"
     supports_live_orders = False
 
-    def __init__(self, db: Session, user_id: uuid.UUID, quote_fn: QuoteFn, *,
+    def __init__(self, db: Session, account: Any, quote_fn: QuoteFn, *,
                  slippage_ticks: int = 1, max_spread_pct: float = 5.0,
                  max_fill_qty_per_pass: int = 0) -> None:
-        self.db, self.user_id, self.quote_fn = db, user_id, quote_fn
+        super().__init__(account)  # raises unless account.mode == "DEMO"
+        self.db, self.quote_fn = db, quote_fn
+        self.user_id: uuid.UUID = account.user_id
         self.slippage_ticks = slippage_ticks
         self.max_spread_pct = max_spread_pct
         self.max_fill_qty_per_pass = max_fill_qty_per_pass
@@ -66,13 +73,26 @@ class PaperBroker:
 
     def _get(self, broker_order_id: str) -> PaperBrokerOrder:
         o = self.db.get(PaperBrokerOrder, broker_order_id)
-        if o is None:
+        if o is None or o.account_id != self.account.id:
             raise BrokerError(f"Unknown broker order {broker_order_id}.")
         return o
 
     # ------------------------------------------------------------ adapter API
 
+    def submit(self, req: OrderRequest) -> BrokerOrderState:
+        return self.place_order(req)
+
+    def cancel(self, broker_order_id: str) -> BrokerOrderState:
+        return self.cancel_order(broker_order_id)
+
+    def poll(self, now: datetime) -> int:
+        return self.match(now)
+
+    def health(self) -> dict[str, Any]:
+        return {"ok": True, "detail": "Paper simulator (DEMO account)."}
+
     def place_order(self, req: OrderRequest) -> BrokerOrderState:
+        self.check_request(req)  # DEMO orders for this account only
         existing = self.find_by_client_id(req.client_order_id)
         if existing is not None:  # idempotent on client_order_id
             return existing
@@ -82,7 +102,8 @@ class PaperBroker:
             raise BrokerError("A limit order needs a positive limit price.")
         o = PaperBrokerOrder(
             broker_order_id=f"PB-{uuid.uuid4().hex[:12]}", client_order_id=req.client_order_id,
-            user_id=self.user_id, side=req.side, quantity=req.quantity,
+            user_id=self.user_id, account_id=self.account.id, account_mode="DEMO",
+            side=req.side, quantity=req.quantity,
             order_type=req.order_type, limit_price=req.limit_price,
             contract={k: str(v) for k, v in req.contract.items()}, status="OPEN",
             created_at=utcnow(), updated_at=utcnow())
@@ -101,14 +122,15 @@ class PaperBroker:
 
     def find_by_client_id(self, client_order_id: str) -> BrokerOrderState | None:
         o = self.db.scalar(select(PaperBrokerOrder).where(
-            PaperBrokerOrder.client_order_id == client_order_id))
+            PaperBrokerOrder.client_order_id == client_order_id,
+            PaperBrokerOrder.account_id == self.account.id))
         return self._state(o) if o else None
 
     def match(self, now: datetime) -> int:
-        """Try to fill every open order for this user against current quotes."""
+        """Try to fill every open order of this account against current quotes."""
         filled = 0
         rows = self.db.scalars(select(PaperBrokerOrder).where(
-            PaperBrokerOrder.user_id == self.user_id,
+            PaperBrokerOrder.account_id == self.account.id,
             PaperBrokerOrder.status.in_(("OPEN", "PARTIAL")))).all()
         for o in rows:
             filled += self._match_one(o, now)
@@ -151,7 +173,8 @@ class PaperBroker:
                                                                   self.max_fill_qty_per_pass)
         n = len(self._state(o).fills) + 1
         self.db.add(PaperBrokerFill(trade_id=f"{o.broker_order_id}-{n}",
-                                    broker_order_id=o.broker_order_id, quantity=qty,
+                                    broker_order_id=o.broker_order_id,
+                                    account_id=o.account_id, account_mode="DEMO", quantity=qty,
                                     price=price, ts=now))
         prev = (o.avg_price or D("0")) * o.filled_qty
         o.filled_qty += qty
@@ -169,3 +192,7 @@ class PaperBroker:
         o.reject_reason, o.updated_at = reason[:500], utcnow()
         self.db.flush()
         return 0
+
+
+# Compatibility alias: existing code and tests refer to the simulator as PaperBroker.
+PaperBroker = PaperExecutionAdapter

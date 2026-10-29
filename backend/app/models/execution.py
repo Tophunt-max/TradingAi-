@@ -7,11 +7,22 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, Date, ForeignKey, Index, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.time import utcnow
 from app.db.base import Base, Money, Price, UUIDPkMixin
+from app.models.accounts import MODE_CHECK, account_fk
 
 ACTIVE_ORDER_STATES = ("CREATED", "VALIDATED", "SUBMITTED", "ACKNOWLEDGED", "PARTIALLY_FILLED",
                        "CANCEL_PENDING", "UNKNOWN", "RECONCILIATION_REQUIRED")
@@ -24,9 +35,16 @@ class Order(UUIDPkMixin, Base):
         UniqueConstraint("client_order_id", name="uq_orders_client_order_id"),
         Index("ix_orders_user_created", "user_id", "created_at"),
         Index("ix_orders_status", "status"),
+        Index("ix_orders_account_status", "account_id", "status"),
+        account_fk("orders"),
+        CheckConstraint(MODE_CHECK, name="account_mode"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Every execution row belongs to exactly one account; (account_id, account_mode) is a
+    # composite FK to accounts(id, mode), so the mode can never disagree with the account.
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4))
     bot_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bots.id", ondelete="SET NULL"))
     signal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("bot_signals.id", ondelete="SET NULL"))
@@ -80,11 +98,16 @@ class OrderEvent(UUIDPkMixin, Base):
 
 class Fill(UUIDPkMixin, Base):
     __tablename__ = "fills"
-    __table_args__ = (UniqueConstraint("broker", "broker_fill_id", name="uq_fills_broker_fill"),)
+    __table_args__ = (UniqueConstraint("broker", "broker_fill_id", name="uq_fills_broker_fill"),
+                      account_fk("fills"), CheckConstraint(MODE_CHECK, name="account_mode"))
 
     order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"),
                                                 index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Every execution row belongs to exactly one account; (account_id, account_mode) is a
+    # composite FK to accounts(id, mode), so the mode can never disagree with the account.
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4))
     broker: Mapped[str] = mapped_column(String(20))
     broker_fill_id: Mapped[str] = mapped_column(String(64))
     side: Mapped[str] = mapped_column(String(4))
@@ -97,9 +120,15 @@ class Fill(UUIDPkMixin, Base):
 
 class Position(UUIDPkMixin, Base):
     __tablename__ = "positions"
-    __table_args__ = (Index("ix_positions_user_status", "user_id", "status"),)
+    __table_args__ = (Index("ix_positions_user_status", "user_id", "status"),
+                      Index("ix_positions_account_status", "account_id", "status"),
+                      account_fk("positions"), CheckConstraint(MODE_CHECK, name="account_mode"))
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Every execution row belongs to exactly one account; (account_id, account_mode) is a
+    # composite FK to accounts(id, mode), so the mode can never disagree with the account.
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4))
     bot_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bots.id", ondelete="SET NULL"))
     entry_order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id",
                                                                  ondelete="CASCADE"))
@@ -136,12 +165,21 @@ class Position(UUIDPkMixin, Base):
 
 
 class DailyRiskState(UUIDPkMixin, Base):
-    """Per-user, per-IST-day risk counters. Persisted, so limits survive restarts."""
+    """Per-account, per-IST-day risk counters. Persisted, so limits survive restarts.
+
+    Limits (RiskSettings) are a per-user policy; usage is counted separately per account,
+    so DEMO activity never consumes REAL limits and vice versa."""
 
     __tablename__ = "daily_risk_state"
-    __table_args__ = (UniqueConstraint("user_id", "trading_day", name="uq_daily_risk_user_day"),)
+    __table_args__ = (
+        UniqueConstraint("account_id", "trading_day", name="uq_daily_risk_account_day"),
+        account_fk("daily_risk_state"), CheckConstraint(MODE_CHECK, name="account_mode"))
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Every execution row belongs to exactly one account; (account_id, account_mode) is a
+    # composite FK to accounts(id, mode), so the mode can never disagree with the account.
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4))
     trading_day: Mapped[date] = mapped_column(Date)
     realized_gross: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
     charges: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
@@ -174,11 +212,17 @@ class PaperBrokerOrder(Base):
     reconciliation works exactly as it will against a real broker."""
 
     __tablename__ = "paper_broker_orders"
-    __table_args__ = (UniqueConstraint("client_order_id", name="uq_paper_orders_client_id"),)
+    __table_args__ = (UniqueConstraint("client_order_id", name="uq_paper_orders_client_id"),
+                      Index("ix_paper_broker_orders_account_status", "account_id", "status"),
+                      account_fk("paper_broker_orders"),
+                      CheckConstraint("account_mode = 'DEMO'", name="demo_only"))
 
     broker_order_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     client_order_id: Mapped[str] = mapped_column(String(64))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # The simulator only ever holds DEMO orders (CHECK + composite FK).
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4), default="DEMO")
     side: Mapped[str] = mapped_column(String(4))
     quantity: Mapped[int]
     order_type: Mapped[str] = mapped_column(String(8))
@@ -195,10 +239,15 @@ class PaperBrokerOrder(Base):
 
 class PaperBrokerFill(Base):
     __tablename__ = "paper_broker_fills"
+    __table_args__ = (account_fk("paper_broker_fills"),
+                      CheckConstraint("account_mode = 'DEMO'", name="demo_only"))
 
     trade_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     broker_order_id: Mapped[str] = mapped_column(
         ForeignKey("paper_broker_orders.broker_order_id", ondelete="CASCADE"), index=True)
+    # The simulator only ever holds DEMO orders (CHECK + composite FK).
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4), default="DEMO")
     quantity: Mapped[int]
     price: Mapped[Decimal] = mapped_column(Price)
     ts: Mapped[datetime]

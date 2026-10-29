@@ -12,6 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.accounts import core as accounts
 from app.core.config import Settings
 from app.core.errors import AppError, AuthenticationError, ConflictError
 from app.core.rate_limit import client_ip
@@ -184,6 +185,9 @@ def register_user(
     except IntegrityError as exc:
         db.rollback()
         raise ConflictError("An account with these details already exists.") from exc
+    # Every new user starts with a DEMO account holding Rs 10,000 of virtual money,
+    # created in the same transaction as the user.
+    accounts.create_demo_account(db, user.id)
 
     identifier = req.email or req.phone
     assert identifier is not None

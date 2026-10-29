@@ -104,8 +104,11 @@ def _suppress_reason(db: Session, bot: Bot, cfg: BotConfig, rs: Any, ctx: C.Ctx,
         BotSignal.bot_id == bot.id, BotSignal.bar_ts >= day0)) or 0
     if bot_today >= cfg.risk.max_entries_per_day:
         return f"Bot daily limit reached ({bot_today}/{cfg.risk.max_entries_per_day})."
-    user_today = db.scalar(select(func.count()).select_from(BotSignal).where(
-        BotSignal.user_id == bot.user_id, BotSignal.bar_ts >= day0)) or 0
+    # Global across every bot of this user in the same account mode.
+    user_today = db.scalar(select(func.count()).select_from(BotSignal)
+                           .join(BotRun, BotRun.id == BotSignal.run_id).where(
+        BotSignal.user_id == bot.user_id, BotRun.account_mode == bot.account_mode,
+        BotSignal.bar_ts >= day0)) or 0
     if user_today >= rs.max_entries_per_day:
         return (f"Global daily entry limit reached ({user_today}/{rs.max_entries_per_day}), "
                 "shared by all your bots.")
@@ -157,12 +160,13 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
     db.flush()
     run.signals_count += 1
     note = " (DEMO data)" if r.is_demo else ""
-    if run.mode != "PAPER" or settings is None or not settings.paper_trading_enabled:
+    if run.mode != "PAPER" or run.account_mode != "DEMO" or settings is None \
+            or not settings.paper_trading_enabled:
         lifecycle.event(db, bot, run, "INFO", "SIGNAL",
                         f"{side} entry signal at {price:.2f}{note}. Signal-only: no order placed.",
                         bar_ts=bar_ts.isoformat(), conditions=results)
         return "SIGNAL"
-    order = paper_entry_for_signal(db, settings, provider, bot, cfg, sig, now)
+    order = paper_entry_for_signal(db, settings, provider, bot, cfg, sig, now, run)
     if order.status == "REJECTED":
         lifecycle.event(db, bot, run, "WARN", "ORDER",
                         f"{side} signal at {price:.2f}{note}; paper entry rejected: "
@@ -175,9 +179,14 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
 
 
 def paper_entry_for_signal(db: Session, settings: Settings, provider: MarketDataProvider,
-                           bot: Bot, cfg: BotConfig, sig: BotSignal, now: datetime) -> Any:
+                           bot: Bot, cfg: BotConfig, sig: BotSignal, now: datetime,
+                           run: BotRun | None = None) -> Any:
+    """Entry for a signal, in the account the run was started in (loaded server-side)."""
     from app.execution import service as EX
+    from app.execution.router import load_account
 
+    account = load_account(db, run.account_id) if run is not None \
+        else lifecycle.run_account(db, bot)
     cache = EX.ChainCache(provider, settings)
     try:
         with db.begin_nested():
@@ -193,7 +202,7 @@ def paper_entry_for_signal(db: Session, settings: Settings, provider: MarketData
                 expiry_selection=cfg.instrument.expiry_selection, order_type=cfg.order.order_type,
                 limit_offset_pct=cfg.order.limit_offset_pct, bot_id=bot.id, signal_id=sig.id,
                 bot_risk_per_trade=cfg.risk.risk_per_trade,
-                bot_square_off=cfg.exit.square_off_time_ist)
+                bot_square_off=cfg.exit.square_off_time_ist, account=account)
             EX.fill_now(db, settings, cache, order, now)
     except EX.ExecutionError as exc:
         raise RuntimeError(f"Paper entry failed: {exc.message}") from exc

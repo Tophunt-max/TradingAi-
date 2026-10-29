@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText, Badge, Card, CardHeader, KeyValue, ListRow } from '../../components/ui';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { fixed, formatINR, formatPrice } from '../../services/format';
+import { correlationNote, familyRows, patternContextLine, patternStatus } from './evidence';
 
 export const BIAS_TONE = { BULLISH: 'positive', BEARISH: 'negative', NEUTRAL: 'neutral', SIDEWAYS: 'warning' };
 const STATUS_ICON = { DONE: ['checkmark-circle', 'positive'], SKIPPED: ['remove-circle-outline', 'textMuted'], FAILED: ['close-circle', 'negative'], BLOCKED: ['lock-closed', 'warning'] };
@@ -115,12 +116,48 @@ export function StrategiesCard({ strategies }) {
 }
 
 function EventRow({ e }) {
+  const status = patternStatus(e);
+  const ctx = patternContextLine(e);
   return (
     <ListRow
       title={e.name}
-      subtitle={`${e.detail} · ${e.bars_ago === 0 ? 'last candle' : `${e.bars_ago} bars ago`}${e.mitigated ? ' · mitigated' : ''}`}
-      right={<Badge label={e.direction} tone={BIAS_TONE[e.direction]} />}
+      subtitle={`${e.detail} · ${e.bars_ago === 0 ? 'last candle' : `${e.bars_ago} bars ago`}${e.mitigated ? ' · mitigated' : ''}${ctx ? `\n${ctx}` : ''}`}
+      right={
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Badge label={e.direction} tone={BIAS_TONE[e.direction]} />
+          {status ? <Badge label={status.label} tone={status.tone} testID="pattern-status" /> : null}
+        </View>
+      }
     />
+  );
+}
+
+export function EvidenceCard({ technical }) {
+  const rows = familyRows(technical);
+  if (!rows.length) return null;
+  return (
+    <Expandable
+      testID="evidence-card"
+      title="Evidence families"
+      subtitle={`Net ${technical.net_family_vote > 0 ? '+' : ''}${technical.net_family_vote} of ${technical.max_family_votes} family votes · ${technical.correlated_pairs.length} correlated pairs`}
+      right={<Badge label={technical.family_bias} tone={BIAS_TONE[technical.family_bias] ?? 'warning'} />}
+    >
+      {rows.map((r) => (
+        <View key={r.key} style={{ paddingVertical: 4, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <AppText variant="bodyStrong" style={{ flex: 1 }}>{r.label}</AppText>
+            <Badge label={r.bias} tone={r.tone} />
+          </View>
+          <AppText variant="caption" tone="muted">{r.detail}</AppText>
+          <AppText variant="caption" tone="faint">
+            {r.members.map((m) => `${m.indicator} ${m.vote == null ? 'n/a' : m.vote > 0 ? '▲' : m.vote < 0 ? '▼' : '•'}`).join('  ')}
+          </AppText>
+        </View>
+      ))}
+      <AppText variant="label" tone="muted" style={{ marginTop: 6 }}>CORRELATION</AppText>
+      <AppText variant="caption" tone="muted">{correlationNote(technical)}</AppText>
+      <AppText variant="caption" tone="faint" style={{ marginTop: 4 }}>{technical.note} Indicator version {technical.indicator_version}.</AppText>
+    </Expandable>
   );
 }
 
@@ -128,7 +165,7 @@ export function PatternsCard({ patterns, structure }) {
   const recent = [...patterns].reverse();
   return (
     <Expandable testID="patterns-card" title="Patterns & structure" subtitle={structure ? structure.label : `${patterns.length} confirmed events`}>
-      <AppText variant="caption" tone="faint">Only confirmed patterns are shown: each appears once all the candles it needs have closed.</AppText>
+      <AppText variant="caption" tone="faint">Each pattern appears once all its candles have closed. Candlesticks then need a confirming close beyond the pattern high or low; until then they are marked UNCONFIRMED.</AppText>
       {recent.length ? recent.map((e, i) => <EventRow key={`${e.name}-${e.confirmed_ts}-${i}`} e={e} />) : <AppText tone="muted">No patterns in this window.</AppText>}
     </Expandable>
   );
@@ -142,9 +179,13 @@ export function SmcCard({ smc }) {
     ['Liquidity sweeps', smc.liquidity_sweeps],
     ['Equal highs / lows', smc.equal_levels],
     ['Displacement', smc.displacement],
-  ];
+    ['Supply / demand zones', smc.supply_demand],
+    ['Breakout retests', smc.breakout_retests],
+    ['Failed breakouts', smc.failed_breakouts],
+  ].filter(([, items]) => items !== undefined);
   return (
-    <Expandable testID="smc-card" title="Smart Money Concepts" subtitle={`Structure trend: ${smc.trend.toLowerCase()}`}>
+    <Expandable testID="smc-card" title="Smart Money Concepts" subtitle={`Structure trend: ${smc.trend.toLowerCase()}${smc.premium_discount ? ` · ${smc.premium_discount.zone.replace('_', ' ').toLowerCase()}` : ''}`}>
+      {smc.disclaimer ? <AppText variant="caption" tone="faint">{smc.disclaimer}</AppText> : null}
       {groups.map(([title, items]) => (
         <View key={title}>
           <AppText variant="label" tone="muted" style={{ marginTop: 6 }}>{title.toUpperCase()}</AppText>
@@ -172,6 +213,15 @@ export function LevelsCard({ data }) {
       <KeyValue label="CCI 20" value={fixed(ind.cci20, 1)} />
       <KeyValue label="Stochastic %K / %D" value={`${fixed(ind.stoch_k, 1)} / ${fixed(ind.stoch_d, 1)}`} />
       <KeyValue label="Relative volume" value={ind.relative_volume == null ? '—' : `${fixed(ind.relative_volume)}×`} />
+      {ind.indicator_version ? (
+        <>
+          <KeyValue label="EMA 100 · SMA 20" value={`${formatPrice(ind.ema100)} · ${formatPrice(ind.sma20)}`} />
+          <KeyValue label="ROC 12 · HV 20 (ann.)" value={`${fixed(ind.roc12)}% · ${ind.hv20 == null ? '—' : `${(ind.hv20 * 100).toFixed(1)}%`}`} />
+          <KeyValue label="Volatility state" value={ind.volatility_state ?? '—'} tone={ind.volatility_state === 'EXPANSION' ? 'warning' : undefined} />
+          <KeyValue label="Ichimoku tenkan / kijun" value={`${formatPrice(ind.ichimoku?.tenkan)} / ${formatPrice(ind.ichimoku?.kijun)}`} />
+          <KeyValue label="Ichimoku cloud (now)" value={`${formatPrice(ind.ichimoku?.cloud_b)} – ${formatPrice(ind.ichimoku?.cloud_a)}`} />
+        </>
+      ) : null}
       <KeyValue label="Last candle" value={`${ind.candle.direction.toLowerCase()} · body ${(ind.candle.body_pct * 100).toFixed(0)}% of range`} />
       {ind.pivots ? (
         <>

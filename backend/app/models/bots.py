@@ -6,11 +6,21 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Enum, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.time import utcnow
 from app.db.base import Base, Money, TimestampMixin, UUIDPkMixin
+from app.models.accounts import MODE_CHECK, account_fk
 
 
 def _enum(e: type[StrEnum], name: str) -> Enum:
@@ -33,13 +43,20 @@ class BotCreationMethod(StrEnum):
 
 
 class TradingMode(StrEnum):
+    """Legacy execution flag kept for compatibility: PAPER maps to account mode DEMO and
+    LIVE to REAL. `Bot.account_mode` is the source of truth for routing."""
+
     PAPER = "PAPER"
     LIVE = "LIVE"
 
 
+MODE_FOR_ACCOUNT = {"DEMO": TradingMode.PAPER, "REAL": TradingMode.LIVE}
+
+
 class Bot(UUIDPkMixin, TimestampMixin, Base):
     __tablename__ = "bots"
-    __table_args__ = (Index("ix_bots_user_status", "user_id", "status"),)
+    __table_args__ = (Index("ix_bots_user_status", "user_id", "status"),
+                      CheckConstraint(MODE_CHECK, name="account_mode"))
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(80))
@@ -52,6 +69,8 @@ class Bot(UUIDPkMixin, TimestampMixin, Base):
                                               default=BotStatus.DRAFT)
     mode: Mapped[TradingMode] = mapped_column(_enum(TradingMode, "trading_mode"),
                                               default=TradingMode.PAPER)
+    # Which of the user's accounts this bot trades in. Runs copy it at start.
+    account_mode: Mapped[str] = mapped_column(String(4), default="DEMO", server_default="DEMO")
     current_version: Mapped[int] = mapped_column(default=1)
     status_reason: Mapped[str | None] = mapped_column(String(200))
     status_changed_at: Mapped[datetime | None]
@@ -118,11 +137,15 @@ class BotRun(UUIDPkMixin, Base):
     """
 
     __tablename__ = "bot_runs"
-    __table_args__ = (Index("ix_bot_runs_status", "status", "lease_until"),)
+    __table_args__ = (Index("ix_bot_runs_status", "status", "lease_until"),
+                      account_fk("bot_runs"), CheckConstraint(MODE_CHECK, name="account_mode"))
 
     bot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bots.id", ondelete="CASCADE"),
                                               index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # The account every order from this run goes to (fixed for the life of the run).
+    account_id: Mapped[uuid.UUID]
+    account_mode: Mapped[str] = mapped_column(String(4))
     config_version: Mapped[int]
     mode: Mapped[str] = mapped_column(String(16), default="SIGNAL_ONLY")
     status: Mapped[str] = mapped_column(String(10), default="RUNNING")

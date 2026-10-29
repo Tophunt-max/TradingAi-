@@ -29,6 +29,8 @@ export function fixed(value, digits = 2) {
 }
 
 export function formatINR(value) {
+  // null/undefined mean "unknown" (e.g. a REAL balance without a broker): never show ₹0.00.
+  if (value === null || value === undefined || value === '') return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

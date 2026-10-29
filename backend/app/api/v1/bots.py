@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
@@ -72,8 +72,13 @@ def ai_draft(body: AiDraftRequest, ctx: AuthDep, db: DbDep,
 def list_bots(
     ctx: AuthDep, db: DbDep,
     status_filter: Annotated[BotStatus | None, Query(alias="status")] = None,
+    account_mode: Annotated[Literal["DEMO", "REAL"] | None,
+                            Query(description="Defaults to the active mode.")] = None,
 ) -> list[BotOut]:
-    stmt = select(Bot).where(Bot.user_id == ctx.user.id)
+    from app.accounts import core as ACC
+
+    mode = account_mode or ACC.active_mode(db, ctx.user.id)
+    stmt = select(Bot).where(Bot.user_id == ctx.user.id, Bot.account_mode == mode)
     if status_filter:
         stmt = stmt.where(Bot.status == status_filter)
     return [svc.to_out(b, db) for b in db.scalars(stmt.order_by(Bot.updated_at.desc())).all()]
@@ -156,6 +161,19 @@ def _lifecycle(action: str):  # type: ignore[no-untyped-def]
     def handler(bot_id: uuid.UUID, ctx: AuthDep, db: DbDep, settings: SettingsDep,
                 request: Request) -> BotDetail:
         bot = svc.get_owned(db, ctx.user.id, bot_id)
+        if action in ("start", "resume") and bot.account_mode != "DEMO":
+            from app.accounts import core as ACC
+            from app.services.accounts import real_unavailable_reasons
+
+            reasons = real_unavailable_reasons(
+                db, settings, ACC.get_account(db, ctx.user.id, bot.account_mode))
+            record_audit(db, action=f"bot.{action}", user_id=ctx.user.id, request=request,
+                         entity_type="bot", entity_id=str(bot.id), outcome="REJECTED",
+                         details={"account_mode": bot.account_mode, "reasons": reasons})
+            db.commit()
+            raise AppError("A REAL-account bot cannot start: live trading is locked.",
+                           code="LIVE_TRADING_LOCKED", status_code=409,
+                           details={"account_mode": bot.account_mode, "reasons": reasons})
         if action in ("start", "resume"):
             report = _report(db, settings, bot)
             if not report.can_activate:

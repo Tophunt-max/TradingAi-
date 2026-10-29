@@ -52,6 +52,7 @@ def engine(tmp_path: Path) -> Iterator[Engine]:
         cfg.attributes["connection"] = conn
         command.downgrade(cfg, "base")
         command.upgrade(cfg, "head")
+    eng.dispose()  # migrations turn SQLite foreign keys off on their connection
     configure_engine(eng)
     yield eng
     eng.dispose()

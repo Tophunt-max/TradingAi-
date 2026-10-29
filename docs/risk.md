@@ -118,3 +118,12 @@ Estimates should be reconciled with the broker's contract note. The calculator i
 Risk limits reduce, but cannot cap, losses during price gaps, illiquidity, data outages or
 broker failures. A stop-loss is checked on each worker pass (default every 15 s) against
 the bid, so the actual exit can be worse than the stop price.
+
+
+## Account modes
+
+Limits are one policy per user and apply identically to the DEMO and REAL accounts. Usage
+(open positions, pending entries, daily counters, funds) is evaluated per account, so the
+limits are global across all bots within one account mode. DEMO funds come from the DEMO
+ledger; a REAL account has no balance source yet, so its funds check fails closed. See
+[accounts.md](accounts.md).

@@ -67,6 +67,11 @@ data. To keep them apart:
 
 ## Account isolation design (Phase 3, for review)
 
+> Implemented (migration 0007). See [accounts.md](accounts.md) and [execution.md](execution.md)
+> for the final model; differences from this sketch: the REAL/broker-connection CHECK is
+> replaced by a CHECK that only DEMO rows carry an opening balance, and the DEMO-only ledger
+> rule is a CHECK constraint plus the composite FK.
+
 - `accounts(id, user_id, mode DEMO|REAL, broker_connection_id NULL, status, created_at)`
   with `UNIQUE(user_id) WHERE mode='DEMO'` and `CHECK (mode='REAL') = (broker_connection_id IS NOT NULL)`.
 - Every order, fill, position, bot run, daily risk row and ledger entry carries `account_id`.

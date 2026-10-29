@@ -100,6 +100,7 @@ export default function Settings() {
       <PreferencesCard />
       <Card>
         <CardHeader title="Security & trading" />
+        <ListRow title="Account" subtitle="Demo balance, ledger and reset" icon="wallet-outline" onPress={() => router.push('/account')} testID="settings-account" />
         <ListRow title="Change password" icon="key-outline" onPress={() => router.push('/settings/security')} />
         <ListRow title="Active sessions" icon="phone-portrait-outline" onPress={() => router.push('/settings/sessions')} />
         <ListRow title="Audit history" icon="list-outline" onPress={() => router.push('/settings/audit')} />

@@ -27,10 +27,14 @@ price trades; paper orders come from bots and manual buys and go through the ris
 - The forming candle is never used (Phase 3).
 
 ## What is detected
-- **Indicators:** EMA 9/21/50/200, RSI, MACD, VWAP (resets each IST session), Supertrend (10, 3), Bollinger (20, 2), ATR, ADX/±DI, CCI, Stochastic, classic pivots (previous completed session), Fibonacci retracements of the last confirmed swing, relative volume (vs the previous 20 bars), candle anatomy.
-- **Candlesticks:** doji, hammer, inverted hammer, shooting star, bullish/bearish engulfing, morning/evening star, inside/outside bars.
+Full definitions, thresholds, warm-up and leakage notes are in
+[technical-analysis.md](technical-analysis.md) (indicator version `ta-3`).
+
+- **Indicators:** SMA, EMA 9/21/50/100/200, RSI, MACD, VWAP (resets each IST session), anchored VWAP, Supertrend (10, 3), Bollinger (20, 2), ATR, ADX/±DI, CCI, Stochastic, ROC, momentum, OBV, volume MA, historical / realized / Parkinson volatility, volatility contraction/expansion, Ichimoku, classic pivots (previous completed session), Fibonacci retracements and extensions of the last confirmed swing, relative volume (vs the previous 20 bars), candle anatomy. Also RSI/MACD/OBV divergences from confirmed pivots, swing labels (HH/HL/LH/LL), trendlines, channels and range boundaries.
+- **Evidence families:** trend, momentum, volume (one vote each) and volatility (context only), plus a correlation matrix that flags indicator pairs with |ρ| > 0.8. Returned as `technical`.
+- **Candlesticks:** doji (standard, long-legged, dragonfly, gravestone), hammer, hanging man, inverted hammer, shooting star, marubozu, spinning top, bullish/bearish engulfing, piercing line, dark cloud cover, harami, tweezer top/bottom, inside/outside bars, morning/evening star, three white soldiers, three black crows, three inside up/down, three-bar reversals. Each has context (wick ratios, close location, relative volume, prior trend, nearest confirmed support/resistance in ATR, volatility regime), a confirmation rule and status, and an invalidation level. Historical outcome statistics: `GET /api/v1/analysis/{symbol}/patterns/stats`.
 - **Chart patterns:** double top/bottom and (inverse) head and shoulders, reported only after a close through the neckline. Also breakout/breakdown and retest, bull/bear flags, and HH/HL or LH/LL structure.
-- **SMC:** BOS, CHOCH, order blocks, fair value gaps (with mitigation), liquidity sweeps, equal highs/lows and displacement.
+- **SMC (price-structure heuristics, not evidence of institutional activity):** BOS, CHOCH, order blocks, fair value gaps (with mitigation), liquidity sweeps, equal highs/lows, displacement, supply/demand zones, breakout and retest, failed breakout, swing structure and premium/discount. Every event has detection and confirmation timestamps, a reference swing/level, an invalidation level and rule, and the window's data-quality status.
 - **Regime:** VOLATILE, TRENDING_UP, TRENDING_DOWN, RANGE_EXPANSION, SQUEEZE or RANGE, from ADX, EMA 50 slope, and the percentiles of ATR% and Bollinger width.
 
 ## Strategies

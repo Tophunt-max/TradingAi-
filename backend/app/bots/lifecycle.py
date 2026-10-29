@@ -12,6 +12,7 @@ from __future__ import annotations
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.accounts import core as ACC
 from app.core.errors import ConflictError
 from app.core.time import utcnow
 from app.models.bots import Bot, BotEvent, BotRun, BotStatus
@@ -40,9 +41,20 @@ def event(db: Session, bot: Bot, run: BotRun | None, level: str, kind: str, mess
                     kind=kind, message=message[:500], data=data))
 
 
+def run_account(db: Session, bot: Bot):  # type: ignore[no-untyped-def]
+    """The account a new run trades in, from the bot's own account mode (server-side)."""
+    if bot.account_mode == "DEMO":
+        return ACC.get_or_create_demo(db, bot.user_id)
+    acc = ACC.get_account(db, bot.user_id, bot.account_mode)
+    if acc is None:
+        raise ConflictError("No real account is connected.", code="LIVE_TRADING_LOCKED")
+    return acc
+
+
 def transition(db: Session, bot: Bot, action: str, reason: str,
                mode: str = "SIGNAL_ONLY") -> BotRun | None:
     allowed, target = TRANSITIONS[action]
+    account = run_account(db, bot) if action == "start" else None
     now = utcnow()
     res = db.execute(
         update(Bot).where(Bot.id == bot.id, Bot.status.in_(allowed))
@@ -59,7 +71,8 @@ def transition(db: Session, bot: Bot, action: str, reason: str,
     if action == "start":
         if run is not None:  # defensive: never two open runs
             run.status, run.ended_at, run.end_reason = "ENDED", now, "superseded"
-        run = BotRun(bot_id=bot.id, user_id=bot.user_id, config_version=bot.current_version,
+        run = BotRun(bot_id=bot.id, user_id=bot.user_id, account_id=account.id,
+                     account_mode=account.mode, config_version=bot.current_version,
                      mode=mode, status="RUNNING", started_at=now)
         db.add(run)
         db.flush()

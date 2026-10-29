@@ -62,6 +62,8 @@ class RiskUsage(ApiModel):
 
 class RiskStatus(ApiModel):
     mode: str
+    # Limits are one policy per user; usage below is for this account mode only.
+    account_mode: str = "DEMO"
     engine_active: bool
     engine_note: str
     limits: RiskLimitsOut

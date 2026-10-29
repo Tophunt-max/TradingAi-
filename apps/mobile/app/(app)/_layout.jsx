@@ -4,6 +4,7 @@ import { usePreferences } from '../../features/account/api';
 
 const TITLES = {
   more: 'More',
+  account: 'Account',
   'system-health': 'System Health',
   'feature/[id]': '',
   'settings/index': 'Profile & Settings',
@@ -28,6 +29,7 @@ const TITLES = {
   education: 'Learn & Grow',
   help: 'Help & Support',
   models: 'AI Model Lab',
+  backtesting: 'Backtesting Lab',
 };
 
 export default function AppLayout() {

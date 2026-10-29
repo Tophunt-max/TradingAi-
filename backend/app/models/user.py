@@ -58,5 +58,8 @@ class UserPreferences(TimestampMixin, Base):
     reduced_motion: Mapped[bool] = mapped_column(default=False)
     haptics_enabled: Mapped[bool] = mapped_column(default=True)
     notifications: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Which account (DEMO | REAL) the app shows and trades in. Switching never moves data.
+    active_account_mode: Mapped[str] = mapped_column(String(4), default="DEMO",
+                                                     server_default="DEMO")
 
     user: Mapped[User] = relationship(back_populates="preferences")

@@ -18,6 +18,7 @@ from app.core.errors import ConflictError, NotFoundError
 from app.core.time import IST, utcnow
 from app.market_data.factory import build_provider
 from app.models.bots import (
+    MODE_FOR_ACCOUNT,
     Bot,
     BotConfigVersion,
     BotCreationMethod,
@@ -104,7 +105,8 @@ def to_out(bot: Bot, db: Session | None = None) -> BotOut:
         id=bot.id, name=bot.name, strategy_id=bot.strategy_id,
         strategy_name=STRATEGIES[bot.strategy_id]["name"], underlying=bot.underlying,
         timeframe=bot.timeframe, creation_method=bot.creation_method, status=bot.status,
-        mode=bot.mode, current_version=bot.current_version, created_at=bot.created_at,
+        mode=bot.mode, account_mode=bot.account_mode, current_version=bot.current_version,
+        created_at=bot.created_at,
         updated_at=bot.updated_at, status_reason=bot.status_reason,
         status_changed_at=bot.status_changed_at,
     )
@@ -150,6 +152,8 @@ def get_owned(db: Session, user_id: uuid.UUID, bot_id: uuid.UUID) -> Bot:
 
 def _sync_columns(bot: Bot, cfg: BotConfig) -> None:
     bot.name = cfg.name
+    bot.account_mode = cfg.account_mode
+    bot.mode = MODE_FOR_ACCOUNT[cfg.account_mode]  # legacy column: DEMO->PAPER, REAL->LIVE
     bot.strategy_id = cfg.strategy_id
     bot.underlying = cfg.instrument.underlying
     bot.timeframe = cfg.timeframe
@@ -308,6 +312,9 @@ def validate(
         "Paper trading is disabled, so the bot runs signal-only.", "ORDERS")
     add("live", "Live trading", None,
         "Locked: no verified broker order adapter (Phase 7).", "ORDERS")
+    add("account_mode", "Account mode", cfg.account_mode == "DEMO",
+        "Runs in the DEMO account with virtual money." if cfg.account_mode == "DEMO"
+        else "REAL-account bots cannot start while live trading is locked.")
 
     activation = [c for c in checks if c.required_for == "ACTIVATION"]
     return ValidationReport(

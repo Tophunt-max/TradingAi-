@@ -823,6 +823,215 @@
         }
       }
     },
+    "/api/v1/accounts": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Accounts",
+        "operationId": "list_accounts_api_v1_accounts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountsOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/accounts/active": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Set Active",
+        "description": "Switch which account the app shows and trades in. Never moves orders or positions.",
+        "operationId": "set_active_api_v1_accounts_active_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetActiveMode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountsOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The REAL account is not available"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/accounts/demo/ledger": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Demo Ledger",
+        "operationId": "demo_ledger_api_v1_accounts_demo_ledger_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LedgerEntryOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/demo/reset": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Demo Reset",
+        "description": "Close all demo positions at their last known price, cancel all demo orders and\nrestore the virtual balance to Rs 10,000. Never touches the REAL account.",
+        "operationId": "demo_reset_api_v1_accounts_demo_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoReset"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoResetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/accounts/real/authorize": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Authorize Live",
+        "description": "Granting live-trading authorisation is impossible while live trading is locked.\nAlways 409 with the blocking reasons; the attempt is audited.",
+        "operationId": "authorize_live_api_v1_accounts_real_authorize_post",
+        "responses": {
+          "409": {
+            "description": "Live trading is locked in this build",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/market/indices": {
       "get": {
         "tags": [
@@ -1495,6 +1704,28 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Defaults to the active mode."
           }
         ],
         "responses": {
@@ -2209,6 +2440,35 @@
         ],
         "summary": "Risk Status",
         "operationId": "risk_status_api_v1_risk_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account whose usage to show; defaults to active.",
+              "title": "Account Mode"
+            },
+            "description": "Account whose usage to show; defaults to active."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2219,13 +2479,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/risk/limits": {
@@ -2280,7 +2545,7 @@
           "risk"
         ],
         "summary": "Kill Switch",
-        "description": "Engaging blocks new entries at once, cancels pending entry orders and (by policy)\nsends exit orders for every open position. Works even if market data is down: exits\nthat cannot fill yet are retried by the execution worker.",
+        "description": "Engaging blocks new entries at once in every account (the switch is part of the\nuser's shared risk policy), cancels pending entry orders and (by policy) sends exit\norders for every open position, account by account through each account's own adapter.\nWorks even if market data is down: exits that cannot fill yet are retried by the\nexecution worker. REAL accounts have no broker client in this build; any failure there\nis counted, never hidden.",
         "operationId": "kill_switch_api_v1_risk_kill_switch_post",
         "requestBody": {
           "content": {
@@ -2328,6 +2593,35 @@
         ],
         "summary": "Summary",
         "operationId": "summary_api_v1_portfolio_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2338,13 +2632,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/orders": {
@@ -2421,6 +2720,28 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -2469,6 +2790,28 @@
               "format": "uuid",
               "title": "Order Id"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -2501,17 +2844,46 @@
           "portfolio"
         ],
         "summary": "Manual Entry",
-        "description": "Manual paper BUY of one option contract. Goes through the same risk manager.",
+        "description": "Manual BUY of one option contract in the active (DEMO) account. Goes through the same\nrisk manager. REAL is refused with 409 while live trading is locked.",
         "operationId": "manual_entry_api_v1_orders_paper_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ManualEntry"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -2534,12 +2906,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/orders/{order_id}/cancel": {
@@ -2564,6 +2931,28 @@
               "format": "uuid",
               "title": "Order Id"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -2656,6 +3045,28 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -2704,6 +3115,28 @@
               "format": "uuid",
               "title": "Position Id"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -2737,6 +3170,35 @@
         ],
         "summary": "Trades Csv",
         "operationId": "trades_csv_api_v1_trades_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2745,13 +3207,18 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/portfolio/charges": {
@@ -2783,6 +3250,28 @@
               ],
               "title": "Day"
             }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to read; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to read; defaults to the active mode."
           }
         ],
         "responses": {
@@ -3286,10 +3775,564 @@
           }
         }
       }
+    },
+    "/api/v1/backtests/strategies": {
+      "get": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Strategies",
+        "operationId": "strategies_api_v1_backtests_strategies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Strategies Api V1 Backtests Strategies Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/backtests/run": {
+      "post": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_v1_backtests_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Run Api V1 Backtests Run Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/backtests/walk-forward": {
+      "post": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Walk Forward",
+        "operationId": "walk_forward_api_v1_backtests_walk_forward_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalkForwardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Walk Forward Api V1 Backtests Walk Forward Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/backtests/sensitivity": {
+      "post": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Sensitivity",
+        "operationId": "sensitivity_api_v1_backtests_sensitivity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SensitivityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Sensitivity Api V1 Backtests Sensitivity Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/backtests/monte-carlo": {
+      "post": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Monte Carlo",
+        "operationId": "monte_carlo_api_v1_backtests_monte_carlo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonteCarloRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Monte Carlo Api V1 Backtests Monte Carlo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analysis/{symbol}/patterns/stats": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Pattern Stats",
+        "operationId": "pattern_stats_api_v1_analysis__symbol__patterns_stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 32,
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "5m",
+                "15m",
+                "1h",
+                "1d"
+              ],
+              "type": "string",
+              "default": "15m",
+              "title": "Timeframe"
+            }
+          },
+          {
+            "name": "horizon",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 5,
+              "title": "Horizon"
+            }
+          },
+          {
+            "name": "cost_bps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 0,
+              "default": 5.0,
+              "title": "Cost Bps"
+            }
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5,
+              "default": 30,
+              "title": "Min Samples"
+            }
+          },
+          {
+            "name": "history",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3000,
+              "minimum": 200,
+              "default": 1500,
+              "title": "History"
+            }
+          },
+          {
+            "name": "by_regime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "By Regime"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternStatsPayload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccountOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "broker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "unavailable_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unavailable Reasons"
+          },
+          "opening_balance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Balance"
+          },
+          "cash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash"
+          },
+          "available_funds": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Funds"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "used_premium": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Premium"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "realized_pnl_total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Pnl Total"
+          },
+          "reset_count": {
+            "type": "integer",
+            "title": "Reset Count"
+          },
+          "last_reset_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reset At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mode",
+          "status",
+          "broker",
+          "available",
+          "unavailable_reasons",
+          "opening_balance",
+          "cash",
+          "available_funds",
+          "equity",
+          "used_premium",
+          "unrealized_pnl",
+          "realized_pnl_total",
+          "reset_count",
+          "last_reset_at",
+          "created_at",
+          "note"
+        ],
+        "title": "AccountOut"
+      },
+      "AccountsOut": {
+        "properties": {
+          "active_mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Active Mode"
+          },
+          "live_trading_enabled": {
+            "type": "boolean",
+            "title": "Live Trading Enabled"
+          },
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountOut"
+            },
+            "type": "array",
+            "title": "Accounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_mode",
+          "live_trading_enabled",
+          "accounts"
+        ],
+        "title": "AccountsOut"
+      },
       "AiDraftRequest": {
         "properties": {
           "underlying": {
@@ -3737,6 +4780,29 @@
             },
             "type": "array",
             "title": "Explanation"
+          },
+          "technical": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technical"
+          },
+          "indicator_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator Version"
           }
         },
         "type": "object",
@@ -3875,6 +4941,180 @@
         ],
         "title": "AuditLogOut"
       },
+      "BacktestRequest": {
+        "properties": {
+          "strategy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Id"
+          },
+          "bot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Id"
+          },
+          "underlying": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "1m",
+                  "3m",
+                  "5m",
+                  "15m",
+                  "30m",
+                  "1h"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CE",
+                  "PE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "bars": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 150.0,
+            "title": "Bars",
+            "default": 1000
+          },
+          "fidelity": {
+            "type": "string",
+            "enum": [
+              "UNDERLYING_PROXY",
+              "HISTORICAL_OPTIONS"
+            ],
+            "title": "Fidelity",
+            "default": "UNDERLYING_PROXY"
+          },
+          "entry_logic": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "ANY"
+            ],
+            "title": "Entry Logic",
+            "default": "ALL"
+          },
+          "entry_conditions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Condition"
+                },
+                "type": "array",
+                "maxItems": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Conditions"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "stop": {
+            "$ref": "#/components/schemas/LevelIn"
+          },
+          "target": {
+            "$ref": "#/components/schemas/LevelIn"
+          },
+          "lot_size": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Lot Size",
+            "default": 1
+          },
+          "costs": {
+            "$ref": "#/components/schemas/CostsIn"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskIn"
+          },
+          "regime_filter": {
+            "type": "boolean",
+            "title": "Regime Filter",
+            "default": false
+          },
+          "compare_timeframes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "3m",
+                "5m",
+                "15m",
+                "30m",
+                "1h"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Compare Timeframes"
+          },
+          "seed": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Seed",
+            "default": 42
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BacktestRequest"
+      },
       "BotConfig-Input": {
         "properties": {
           "name": {
@@ -3940,6 +5180,15 @@
             "const": "PAPER",
             "title": "Mode",
             "default": "PAPER"
+          },
+          "account_mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Account Mode",
+            "default": "DEMO"
           }
         },
         "additionalProperties": false,
@@ -4020,6 +5269,15 @@
             "const": "PAPER",
             "title": "Mode",
             "default": "PAPER"
+          },
+          "account_mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Account Mode",
+            "default": "DEMO"
           }
         },
         "additionalProperties": false,
@@ -4103,6 +5361,11 @@
           },
           "mode": {
             "$ref": "#/components/schemas/TradingMode"
+          },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode",
+            "default": "DEMO"
           },
           "current_version": {
             "type": "integer",
@@ -4344,6 +5607,11 @@
           "mode": {
             "$ref": "#/components/schemas/TradingMode"
           },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode",
+            "default": "DEMO"
+          },
           "current_version": {
             "type": "integer",
             "title": "Current Version"
@@ -4496,6 +5764,10 @@
             "type": "string",
             "title": "Mode"
           },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode"
+          },
           "status": {
             "type": "string",
             "title": "Status"
@@ -4590,6 +5862,7 @@
           "id",
           "config_version",
           "mode",
+          "account_mode",
           "status",
           "started_at",
           "ended_at",
@@ -5319,6 +6592,160 @@
         ],
         "title": "Condition"
       },
+      "CostsIn": {
+        "properties": {
+          "spread_bps": {
+            "type": "number",
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Spread Bps",
+            "default": 2.0
+          },
+          "slippage_bps": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Slippage Bps",
+            "default": 0.0
+          },
+          "slippage_ticks": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Slippage Ticks",
+            "default": 1
+          },
+          "tick_size": {
+            "type": "number",
+            "maximum": 10.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Tick Size",
+            "default": 0.05
+          },
+          "brokerage_per_order": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brokerage Per Order"
+          },
+          "charge_premium": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Premium"
+          },
+          "charge_premium_pct": {
+            "type": "number",
+            "maximum": 10.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Charge Premium Pct",
+            "default": 0.6
+          },
+          "reject_probability": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": 0.0,
+            "title": "Reject Probability",
+            "default": 0.0
+          },
+          "partial_fill_probability": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Partial Fill Probability",
+            "default": 0.0
+          },
+          "min_volume": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Min Volume",
+            "default": 0.0
+          },
+          "latency_bars": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Latency Bars",
+            "default": 0
+          },
+          "entry_fill": {
+            "type": "string",
+            "enum": [
+              "NEXT_OPEN",
+              "NEXT_BAR_WORST"
+            ],
+            "title": "Entry Fill",
+            "default": "NEXT_OPEN"
+          },
+          "stop_fill": {
+            "type": "string",
+            "enum": [
+              "STOP_PRICE",
+              "BAR_WORST"
+            ],
+            "title": "Stop Fill",
+            "default": "STOP_PRICE"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CostsIn"
+      },
+      "DemoReset": {
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "description": "Must be true. Resetting closes demo positions, cancels demo orders and restores the virtual balance."
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirm"
+        ],
+        "title": "DemoReset"
+      },
+      "DemoResetOut": {
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountOut"
+          },
+          "orders_cancelled": {
+            "type": "integer",
+            "title": "Orders Cancelled"
+          },
+          "positions_closed": {
+            "type": "integer",
+            "title": "Positions Closed"
+          },
+          "reset_count": {
+            "type": "integer",
+            "title": "Reset Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account",
+          "orders_cancelled",
+          "positions_closed",
+          "reset_count"
+        ],
+        "title": "DemoResetOut"
+      },
       "EntrySpec": {
         "properties": {
           "logic": {
@@ -5589,6 +7016,46 @@
         ],
         "title": "ForgotPasswordRequest"
       },
+      "GridIn": {
+        "properties": {
+          "stops_pct": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Stops Pct"
+          },
+          "targets_pct": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Targets Pct"
+          },
+          "thresholds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thresholds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GridIn"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5785,6 +7252,81 @@
         ],
         "title": "KillSwitchRequest"
       },
+      "LedgerEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "balance_after": {
+            "type": "string",
+            "title": "Balance After"
+          },
+          "ref_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Type"
+          },
+          "ref_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "seq",
+          "kind",
+          "amount",
+          "balance_after",
+          "ref_type",
+          "ref_id",
+          "note",
+          "created_at"
+        ],
+        "title": "LedgerEntryOut"
+      },
       "Level-Input": {
         "properties": {
           "type": {
@@ -5839,6 +7381,31 @@
           "value"
         ],
         "title": "Level"
+      },
+      "LevelIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "PERCENT",
+              "POINTS"
+            ],
+            "title": "Type",
+            "default": "PERCENT"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 5000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "LevelIn"
       },
       "LoginRequest": {
         "properties": {
@@ -6203,6 +7770,33 @@
         ],
         "title": "ModelOut"
       },
+      "MonteCarloRequest": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/BacktestRequest"
+          },
+          "simulations": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 100.0,
+            "title": "Simulations",
+            "default": 1000
+          },
+          "seed": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Seed",
+            "default": 7
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "MonteCarloRequest"
+      },
       "MoversPayload": {
         "properties": {
           "source": {
@@ -6516,6 +8110,10 @@
             "type": "string",
             "title": "Id"
           },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode"
+          },
           "client_order_id": {
             "type": "string",
             "title": "Client Order Id"
@@ -6716,6 +8314,7 @@
         "type": "object",
         "required": [
           "id",
+          "account_mode",
           "client_order_id",
           "broker_order_id",
           "bot_id",
@@ -6789,6 +8388,10 @@
           "id": {
             "type": "string",
             "title": "Id"
+          },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode"
           },
           "client_order_id": {
             "type": "string",
@@ -6956,6 +8559,7 @@
         "type": "object",
         "required": [
           "id",
+          "account_mode",
           "client_order_id",
           "broker_order_id",
           "bot_id",
@@ -7066,6 +8670,37 @@
         ],
         "title": "Page[AuditLogOut]"
       },
+      "Page_LedgerEntryOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[LedgerEntryOut]"
+      },
       "Page_OrderOut_": {
         "properties": {
           "items": {
@@ -7128,6 +8763,154 @@
         ],
         "title": "Page[PositionOut]"
       },
+      "PatternStatsPayload": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "LIVE",
+              "DELAYED"
+            ],
+            "title": "Source"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo"
+          },
+          "is_live": {
+            "type": "boolean",
+            "title": "Is Live"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "indicator_version": {
+            "type": "string",
+            "title": "Indicator Version"
+          },
+          "evidence_status": {
+            "type": "string",
+            "enum": [
+              "NOT_EVIDENCE",
+              "HISTORICAL_SAMPLE"
+            ],
+            "title": "Evidence Status"
+          },
+          "evidence_note": {
+            "type": "string",
+            "title": "Evidence Note"
+          },
+          "outcome_definition": {
+            "type": "string",
+            "title": "Outcome Definition"
+          },
+          "horizon_bars": {
+            "type": "integer",
+            "title": "Horizon Bars"
+          },
+          "cost_bps": {
+            "type": "number",
+            "title": "Cost Bps"
+          },
+          "min_samples": {
+            "type": "integer",
+            "title": "Min Samples"
+          },
+          "candles": {
+            "type": "integer",
+            "title": "Candles"
+          },
+          "first_ts": {
+            "title": "First Ts"
+          },
+          "last_ts": {
+            "title": "Last Ts"
+          },
+          "patterns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Patterns"
+          },
+          "baseline": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Baseline"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "provider",
+          "is_demo",
+          "is_live",
+          "as_of",
+          "disclaimer",
+          "quality",
+          "notes",
+          "symbol",
+          "timeframe",
+          "indicator_version",
+          "evidence_status",
+          "evidence_note",
+          "outcome_definition",
+          "horizon_bars",
+          "cost_bps",
+          "min_samples",
+          "candles",
+          "first_ts",
+          "last_ts",
+          "patterns",
+          "baseline",
+          "limitations"
+        ],
+        "title": "PatternStatsPayload"
+      },
       "PipelineStep": {
         "properties": {
           "key": {
@@ -7166,8 +8949,30 @@
         "properties": {
           "mode": {
             "type": "string",
-            "const": "PAPER",
+            "enum": [
+              "PAPER",
+              "LIVE"
+            ],
             "title": "Mode"
+          },
+          "account_mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Account Mode"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
           },
           "engine_active": {
             "type": "boolean",
@@ -7189,11 +8994,47 @@
             "title": "Data Source"
           },
           "capital": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Capital"
           },
+          "cash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
           "available_funds": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Available Funds"
           },
           "used_margin": {
@@ -7252,10 +9093,14 @@
         "type": "object",
         "required": [
           "mode",
+          "account_mode",
+          "account_id",
           "engine_active",
           "note",
           "data_source",
           "capital",
+          "cash",
+          "equity",
           "available_funds",
           "used_margin",
           "realized_pnl_today",
@@ -7278,6 +9123,10 @@
           "id": {
             "type": "string",
             "title": "Id"
+          },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode"
           },
           "bot_id": {
             "anyOf": [
@@ -7457,6 +9306,7 @@
         "type": "object",
         "required": [
           "id",
+          "account_mode",
           "bot_id",
           "instrument",
           "underlying",
@@ -8242,6 +10092,133 @@
         ],
         "title": "ResetPasswordRequest"
       },
+      "RiskIn": {
+        "properties": {
+          "risk_per_trade": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Per Trade"
+          },
+          "daily_loss_limit": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Loss Limit"
+          },
+          "daily_profit_lock": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Profit Lock"
+          },
+          "max_entries_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Entries Per Day"
+          },
+          "lots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lots"
+          },
+          "re_entry_after_stop_loss": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Re Entry After Stop Loss"
+          },
+          "square_off_time_ist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Square Off Time Ist"
+          },
+          "session_start_ist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Start Ist"
+          },
+          "session_end_ist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session End Ist"
+          },
+          "cooldown_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Minutes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RiskIn",
+        "description": "Overrides may only be stricter than the user's global risk limits."
+      },
       "RiskLimitsOut": {
         "properties": {
           "capital": {
@@ -8574,6 +10551,11 @@
             "type": "string",
             "title": "Mode"
           },
+          "account_mode": {
+            "type": "string",
+            "title": "Account Mode",
+            "default": "DEMO"
+          },
           "engine_active": {
             "type": "boolean",
             "title": "Engine Active"
@@ -8709,6 +10691,22 @@
         ],
         "title": "SearchHit"
       },
+      "SensitivityRequest": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/BacktestRequest"
+          },
+          "grid": {
+            "$ref": "#/components/schemas/GridIn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "SensitivityRequest"
+      },
       "SessionOut": {
         "properties": {
           "id": {
@@ -8813,6 +10811,23 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SessionSpec"
+      },
+      "SetActiveMode": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "SetActiveMode"
       },
       "Signal": {
         "properties": {
@@ -9146,7 +11161,8 @@
           "PAPER",
           "LIVE"
         ],
-        "title": "TradingMode"
+        "title": "TradingMode",
+        "description": "Legacy execution flag kept for compatibility: PAPER maps to account mode DEMO and\nLIVE to REAL. `Bot.account_mode` is the source of truth for routing."
       },
       "TrainRequest": {
         "properties": {
@@ -9451,6 +11467,68 @@
           "code"
         ],
         "title": "VerifyRequest"
+      },
+      "WalkForwardRequest": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/BacktestRequest"
+          },
+          "grid": {
+            "$ref": "#/components/schemas/GridIn"
+          },
+          "train_bars": {
+            "type": "integer",
+            "maximum": 1500.0,
+            "minimum": 150.0,
+            "title": "Train Bars",
+            "default": 400
+          },
+          "test_bars": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 50.0,
+            "title": "Test Bars",
+            "default": 150
+          },
+          "holdout_pct": {
+            "type": "number",
+            "maximum": 40.0,
+            "minimum": 0.0,
+            "title": "Holdout Pct",
+            "default": 20
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "net_pnl",
+              "profit_factor",
+              "expectancy",
+              "sharpe"
+            ],
+            "title": "Objective",
+            "default": "net_pnl"
+          },
+          "min_trades": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Min Trades",
+            "default": 3
+          },
+          "max_windows": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Max Windows",
+            "default": 6
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "WalkForwardRequest"
       }
     },
     "securitySchemes": {

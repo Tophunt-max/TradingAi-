@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, Button, Card, CardHeader, ChipRow, DataSourceBadge, ListRow, NoticeBanner, QueryState, Screen, Select } from '../../../components/ui';
 import { ProbabilityCard } from '../../../features/ai/ProbabilityCard';
-import { LevelsCard, MtfStrip, PatternsCard, PipelineCard, RegimeCard, SetupCard, SmcCard, StrategiesCard } from '../../../features/ai/Sections';
+import { EvidenceCard, LevelsCard, MtfStrip, PatternsCard, PipelineCard, RegimeCard, SetupCard, SmcCard, StrategiesCard } from '../../../features/ai/Sections';
 import { useAnalysis, useMtf } from '../../../features/market/api';
 import { QualityBanner } from '../../../features/market/QualityBanner';
 import { FEATURES, featureHref } from '../../../features/roadmap';
@@ -54,6 +54,7 @@ export default function AiLab() {
             <MtfStrip data={mtf.data} />
             <SetupCard setup={d.setup_candidate} options={d.options} />
             <StrategiesCard strategies={d.strategies} />
+            <EvidenceCard technical={d.technical} />
             <PatternsCard patterns={d.patterns} structure={d.structure} />
             <SmcCard smc={d.smc} />
             <LevelsCard data={d} />

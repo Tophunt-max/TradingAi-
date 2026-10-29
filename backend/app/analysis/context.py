@@ -24,6 +24,8 @@ class Ctx:
     v: list[float]
     s: dict[str, list[Any]] = field(default_factory=dict)
     intraday: bool = True
+    timeframe: str | None = None
+    cache: dict[str, Any] = field(default_factory=dict)  # derived, non-series values
 
     def __len__(self) -> int:
         return len(self.c)
@@ -33,16 +35,18 @@ class Ctx:
         return series[-1 if i is None else i]
 
 
-def build(candles: list[dict[str, Any]], intraday: bool = True) -> Ctx:
+def build(candles: list[dict[str, Any]], intraday: bool = True,
+          timeframe: str | None = None) -> Ctx:
     o = [float(k["open"]) for k in candles]
     h = [float(k["high"]) for k in candles]
     lo = [float(k["low"]) for k in candles]
     c = [float(k["close"]) for k in candles]
     v = [float(k.get("volume") or 0) for k in candles]
     ts = [k["ts"] for k in candles]
-    ctx = Ctx(candles=candles, ts=ts, o=o, h=h, l=lo, c=c, v=v, intraday=intraday)
+    ctx = Ctx(candles=candles, ts=ts, o=o, h=h, l=lo, c=c, v=v, intraday=intraday,
+              timeframe=timeframe)
     s = ctx.s
-    for p in (5, 9, 13, 21, 50, 200):
+    for p in (5, 9, 13, 21, 50, 100, 200):
         s[f"ema{p}"] = ind.ema(c, p)
     s["rsi14"] = ind.rsi(c, 14)
     s["macd"], s["macd_signal"], s["macd_hist"] = ind.macd(c)
@@ -57,6 +61,20 @@ def build(candles: list[dict[str, Any]], intraday: bool = True) -> Ctx:
     has_volume = any(v)
     s["vwap"] = (ind.vwap(h, lo, c, v, keys) if intraday and has_volume
                  else [None] * len(c))
+    # ta-3 additions (all causal; see docs/technical-analysis.md).
+    ppy = ind.periods_per_year(timeframe if intraday else None)
+    s["sma20"] = ind.sma(c, 20)
+    s["roc12"] = ind.roc(c, 12)
+    s["mom10"] = ind.momentum(c, 10)
+    s["obv"] = ind.obv(c, v) if has_volume else [None] * len(c)
+    s["volma20"] = ind.volume_ma(v, 20) if has_volume else [None] * len(c)
+    s["hv20"] = ind.historical_volatility(c, 20, ppy)
+    s["rv20"] = ind.realized_volatility(c, 20)
+    s["pkv20"] = ind.parkinson_volatility(h, lo, 20, ppy)
+    s["vol_score"], s["vol_state"] = ind.volatility_state(h, lo, c)
+    ichi = ind.ichimoku(h, lo)
+    for k in ("tenkan", "kijun", "senkou_a", "senkou_b", "span_a", "span_b"):
+        s[f"ichi_{k}"] = ichi[k]
     return ctx
 
 
