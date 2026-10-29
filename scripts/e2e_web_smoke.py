@@ -194,7 +194,8 @@ def main() -> int:
             page.go_back()
             expect(page.get_by_role("heading", name="My Bots")).to_be_visible()
             page.get_by_role("tab", name=re.compile("Stopped")).click()
-            expect(page.get_by_role("button", name=re.compile(r"^NIFTY .* (CE|PE), STOPPED"))).to_be_visible(timeout=10_000)
+            stopped_card = re.compile(r"^NIFTY .* (CE|PE), STOPPED")
+            expect(page.get_by_role("button", name=stopped_card)).to_be_visible(timeout=10_000)
             shot("09-my-bots")
 
             # Portfolio -> Risk Center -> kill switch.
