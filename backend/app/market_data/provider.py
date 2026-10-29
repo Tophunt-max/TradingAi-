@@ -6,6 +6,7 @@ provenance (source, provider, as_of) and a data-quality report.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Protocol
@@ -63,12 +64,15 @@ class UnknownInstrument(KeyError):
 class DemoProvider:
     name = "DEMO"
 
+    def __init__(self, now: Callable[[], datetime] = utcnow) -> None:
+        self._now = now
+
     def _r(self, data: Any, now: datetime, notes: list[str] | None = None) -> Result:
         return Result(data=data, as_of=now, source="DEMO", provider=self.name,
                       notes=notes or [])
 
     def quotes(self, symbols: list[str] | None, segment: str) -> Result:
-        now = utcnow()
+        now = self._now()
         out = []
         for sym, inst in demo.INSTRUMENTS.items():
             if symbols is not None and sym not in symbols:
@@ -81,17 +85,17 @@ class DemoProvider:
     def candles(self, symbol: str, timeframe: str, limit: int) -> Result:
         if symbol not in demo.INSTRUMENTS:
             raise UnknownInstrument(symbol)
-        now = utcnow()
+        now = self._now()
         return self._r(demo.candles(symbol, timeframe, now, limit), now,
                        ["Only closed candles are returned; the forming candle is excluded."])
 
     def expiries(self, underlying: str) -> Result:
-        now = utcnow()
+        now = self._now()
         return self._r(demo_options.demo_expiries(now), now,
                        ["DEMO expiries are illustrative dates, not the exchange calendar."])
 
     def option_chain(self, underlying: str, expiry: date | None, strikes: int) -> Result:
-        now = utcnow()
+        now = self._now()
         valid = demo_options.demo_expiries(now)
         exp = expiry or valid[0]
         if exp not in valid:

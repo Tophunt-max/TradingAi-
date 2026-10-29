@@ -8,8 +8,10 @@ const TABS = ['ACTIVE', 'PAUSED', 'STOPPED', 'DRAFT'];
 
 export default function Bots() {
   const bots = useBots();
-  const [tab, setTab] = useState('DRAFT');
+  const [picked, setPicked] = useState(null);
   const counts = Object.fromEntries(TABS.map((t) => [t, (bots.data ?? []).filter((b) => b.status === t).length]));
+  const tab = picked ?? (counts.ACTIVE ? 'ACTIVE' : 'DRAFT');
+  const setTab = setPicked;
   return (
     <Screen title="My Bots" subtitle="All bots share one global risk budget" refreshing={bots.isRefetching} onRefresh={bots.refetch}>
       <SegmentedControl
@@ -27,14 +29,16 @@ export default function Bots() {
               <StateView
                 kind="empty"
                 title={tab === 'DRAFT' ? 'No draft bots' : `No ${tab.toLowerCase()} bots`}
-                message={tab === 'DRAFT' ? 'Create a bot with AI Auto Create, the manual builder or a template.' : 'Bots cannot run until the paper execution engine ships (Phase 6).'}
+                message={tab === 'DRAFT' ? 'Create a bot with AI Auto Create, the manual builder or a template.' : 'Start a validated bot from its details screen.'}
               />
             );
           }
           return rows.map((b) => <BotCard key={b.id} bot={b} />);
         }}
       </QueryState>
-      <NoticeBanner tone="info">Status comes from the backend. Starting bots is disabled until the execution engine and global risk manager exist.</NoticeBanner>
+      <NoticeBanner tone="info">
+        Status and health come from the backend worker. Running bots are signal-only: they record entry signals on each closed candle but place no orders until paper execution and the risk manager ship (Phase 6).
+      </NoticeBanner>
     </Screen>
   );
 }

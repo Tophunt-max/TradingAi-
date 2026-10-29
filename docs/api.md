@@ -59,7 +59,8 @@ served at `http://localhost:8000/docs` in development and test only.
 | POST | `/bots/{id}/clone` | ✓ | |
 | DELETE | `/bots/{id}?confirm=true` | ✓ | Requires explicit confirmation |
 | POST | `/bots/{id}/validate` | ✓ | Pre-activation checks against global limits |
-| POST | `/bots/{id}/start\|pause\|resume\|stop` | ✓ | 409 `EXECUTION_UNAVAILABLE` until Phase 6 |
+| POST | `/bots/{id}/start\|pause\|resume\|stop` | ✓ | State machine (409 `INVALID_BOT_STATE`); start/resume re-validate (409 `VALIDATION_FAILED`). Runs are signal-only |
+| GET | `/bots/{id}/signals`, `/bots/{id}/events`, `/bots/{id}/runs` | ✓ | Recorded signals, bot log, run history |
 | GET | `/risk` | ✓ | Global limits, usage, block reasons |
 | PATCH | `/risk/limits` | ✓ | Cross-field validated, audited |
 | POST | `/risk/kill-switch` | ✓ | `{engaged, confirm: true}`; persisted |

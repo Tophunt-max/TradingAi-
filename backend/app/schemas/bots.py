@@ -161,6 +161,47 @@ class BotUpdate(ApiModel):
     config: BotConfig
 
 
+class BotRunOut(ApiModel):
+    id: uuid.UUID
+    config_version: int
+    mode: str
+    status: str
+    started_at: datetime
+    ended_at: datetime | None
+    end_reason: str | None
+    last_heartbeat_at: datetime | None
+    last_bar_ts: datetime | None
+    last_error: str | None
+    last_error_at: datetime | None
+    consecutive_errors: int
+    signals_count: int
+
+
+class BotSignalOut(ApiModel):
+    id: uuid.UUID
+    run_id: uuid.UUID
+    config_version: int
+    bar_ts: datetime
+    side: str
+    underlying: str
+    timeframe: str
+    price: Decimal
+    regime: str | None
+    conditions: list[dict[str, Any]]
+    data_source: str
+    created_at: datetime
+
+
+class BotEventOut(ApiModel):
+    id: uuid.UUID
+    run_id: uuid.UUID | None
+    ts: datetime
+    level: str
+    kind: str
+    message: str
+    data: dict[str, Any]
+
+
 class BotOut(ApiModel):
     id: uuid.UUID
     name: str
@@ -179,7 +220,13 @@ class BotOut(ApiModel):
     total_net_pnl: Decimal | None = None
     trade_count: int = 0
     last_signal: str | None = None
+    last_signal_at: datetime | None = None
+    signals_today: int = 0
     health: str = "NOT_RUNNING"
+    health_detail: str | None = None
+    status_reason: str | None = None
+    status_changed_at: datetime | None = None
+    run: BotRunOut | None = None
 
 
 class BotDetail(BotOut):
@@ -192,12 +239,16 @@ class ValidationCheck(ApiModel):
     label: str
     status: Literal["PASS", "FAIL", "WARN"]
     message: str
+    # ACTIVATION checks gate starting the bot (signal-only); ORDERS checks gate orders.
+    required_for: Literal["ACTIVATION", "ORDERS"] = "ACTIVATION"
 
 
 class ValidationReport(ApiModel):
     bot_id: uuid.UUID
     version: int
     can_activate: bool
+    activation_mode: Literal["SIGNAL_ONLY"] = "SIGNAL_ONLY"
+    can_place_orders: bool = False
     checks: list[ValidationCheck]
 
 
@@ -207,7 +258,7 @@ class AiDraftRequest(ApiModel):
     timeframe: Timeframe = "5m"
     capital: Decimal = Field(gt=0, le=Decimal("10000000"))
     risk_profile: Literal["CONSERVATIVE", "MODERATE", "AGGRESSIVE"] = "CONSERVATIVE"
-    option_type: Literal["CE", "PE"] = "CE"
+    option_type: Literal["CE", "PE", "AUTO"] = "CE"
 
 
 class AiDraftResponse(ApiModel):
@@ -215,6 +266,8 @@ class AiDraftResponse(ApiModel):
     config: BotConfig
     rationale: list[str]
     warnings: list[str]
+    analysis_regime: str | None = None
+    analysis_trend: str | None = None
 
 
 class StrategyOut(ApiModel):
@@ -226,3 +279,4 @@ class StrategyOut(ApiModel):
     regimes: list[str]
     research_only: bool
     default_entry: list[dict[str, Any]]
+    default_entry_pe: list[dict[str, Any]] = []

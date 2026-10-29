@@ -46,5 +46,18 @@ services:
     depends_on:
       redis: { condition: service_healthy }
 
+  # Persistent bot worker (signal-only until Phase 6). Safe to scale: runs are leased.
+  bot-runner:
+    build: ./backend
+    profiles: ["workers", "live"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://quantai:${POSTGRES_PASSWORD:-quantai_dev_only}@postgres:5432/quantai
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "-m", "app.workers.bot_runner", "--interval", "15"]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+
 volumes:
   pgdata:

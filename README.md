@@ -10,7 +10,16 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 > not live profits and do not guarantee future returns. **Live trading is disabled in
 > this build.**
 
-## Current status: Phase 4 (analysis engine) complete
+## Current status: Phase 5 (bot system) complete
+
+Bots can now be started, paused, resumed and stopped for real. A persistent, horizontally scalable
+worker evaluates each running bot's configured entry conditions on every closed candle. It records
+**signals only (no orders)** and enforces session windows, cooldowns and the **global daily entry
+limit shared by all bots**. Bot details show runtime health, signals, logs and runs. AI Auto Create
+now picks the strategy from the market regime and the side from the trend. See
+[docs/bots.md](docs/bots.md).
+
+## Phase 4 (analysis engine)
 
 Phase 4 adds the analysis pipeline:
 - More indicators: VWAP, Supertrend, ADX, CCI, Stochastic, pivots, Fibonacci and relative volume.
@@ -117,7 +126,7 @@ python scripts/e2e_web_smoke.py --dist apps/mobile/dist      # browser E2E (need
 | 2 ✅ | Mobile UI for dashboard, markets, charts, option chain, AI, bots, orders, positions, portfolio, risk center, alerts, wired to typed contracts |
 | 3 ✅ | Authorised market-data provider (INDstocks), instrument master, candles, live updates, option chain, data-quality validation |
 | 4 ✅ | Indicators, candlestick patterns, SMC, regime detection, strategy router, baseline AI predictions, explanations |
-| 5 | Bot system: AI Auto Create, manual builder, templates, validation, lifecycle, persistent workers |
+| 5 ✅ | Bot system: AI Auto Create, manual builder, templates, validation, lifecycle, persistent workers |
 | 6 | Global risk manager, order state machine, simulated fills, charges, restart recovery, kill switch |
 | 7 | Backtesting (walk-forward, no lookahead), model registry, drift detection, reports |
 | 8 | Verified broker adapter. Live trading stays locked until every test passes and the user explicitly authorises it |
@@ -157,6 +166,11 @@ Yeh integration abhi asli INDstocks token ke saath test nahi hua hai.
 aur chart patterns, Smart Money Concepts, market regime, strategy router aur AI model lab. AI probability tabhi
 dikhegi jab model asli data par baseline se behtar aur calibrated sabit ho, aur admin use promote kare.
 Decision abhi bhi NO TRADE rehta hai, kyunki charges aur risk manager Phase 6 mein aayenge.
+
+**Phase 5 mein kya aaya:** bots ab sach mein Start/Pause/Resume/Stop hote hain. Ek background worker har band
+candle par bot ki entry conditions check karta hai aur signal record karta hai, lekin **koi order nahi lagata**
+(orders Phase 6 mein aayenge). Cooldown, session time aur saare bots ke liye ek global daily limit lagte hain.
+Worker chalane ke liye: `python -m app.workers.bot_runner`.
 
 **Abhi kya baaki hai:** Real market data, AI analysis, bots, risk manager, paper
 execution, backtesting aur broker integration. Ye sab agle phases mein banenge. Jo screen

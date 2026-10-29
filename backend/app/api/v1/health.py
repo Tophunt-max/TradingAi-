@@ -15,6 +15,7 @@ from app.api.deps import DbDep, SettingsDep
 from app.core.config import MarketDataMode, Settings
 from app.core.time import utcnow
 from app.market_data.factory import build_provider
+from app.models.bots import WorkerHeartbeat
 
 router = APIRouter(prefix="/health", tags=["health"])
 logger = logging.getLogger("app.health")
@@ -101,8 +102,18 @@ def ready(db: DbDep, settings: SettingsDep) -> JSONResponse:
 
     components.extend(_market_data_health(db, settings))
 
-    # Workers and broker integrations not built yet (Phases 5, 6, 8).
-    for name in ("ai_worker", "execution_worker", "broker"):
+    hb = db.get(WorkerHeartbeat, "bot_runner")
+    if hb is None:
+        components.append(ComponentHealth(name="bot_worker", status="not_configured",
+                                          detail="No bot worker has reported yet."))
+    else:
+        age = (utcnow() - hb.last_seen).total_seconds()
+        components.append(ComponentHealth(
+            name="bot_worker", status="ok" if age < 120 else "degraded",
+            detail=f"Last pass {int(age)}s ago; {hb.info.get('runs', 0)} running bot(s)."))
+
+    # Not built yet (Phases 6 and 8).
+    for name in ("execution_worker", "broker"):
         components.append(ComponentHealth(name=name, status="not_configured",
                                           detail="Not implemented in this build."))
 

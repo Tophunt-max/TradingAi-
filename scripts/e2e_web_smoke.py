@@ -68,7 +68,8 @@ def main() -> int:
     log_path = tmp / "api.log"
     env = {**os.environ, "ENVIRONMENT": "development",
            "DATABASE_URL": f"sqlite:///{tmp / 'e2e.db'}", "OTP_DELIVERY": "console",
-           "CORS_ORIGINS": web_url}
+           "CORS_ORIGINS": web_url, "BOT_WORKER_EMBEDDED": "true",
+           "BOT_WORKER_INTERVAL_SECONDS": "2"}
     if args.live_fake:
         env |= {"MARKET_DATA_MODE": "INDSTOCKS", "INDSTOCKS_DATA_USER_EMAILS": email}
     backend = ROOT / "backend"
@@ -173,15 +174,27 @@ def main() -> int:
             expect(page.get_by_text("Why this configuration")).to_be_visible(timeout=10_000)
             shot("07-ai-create-review")
             page.get_by_test_id("ai-save").click()
-            expect(page.get_by_test_id("validation-report")).to_contain_text("BLOCKED",
-                                                                             timeout=10_000)
+            expect(page.get_by_test_id("validation-report")).to_contain_text(
+                "READY (SIGNAL-ONLY)", timeout=10_000)
+            expect(page.get_by_test_id("validation-report")).to_contain_text("ORDERS BLOCKED")
             page.get_by_test_id("bot-start").click()
-            expect(page.get_by_test_id("bot-notice")).to_contain_text("cannot run yet")
-            shot("08-bot-detail")
+            page.get_by_role("alert").get_by_role("button", name="Start").click()
+            expect(page.get_by_test_id("bot-status")).to_contain_text("ACTIVE", timeout=10_000)
+            # The embedded worker evaluates the bot within a few seconds.
+            expect(page.get_by_test_id("bot-health")).to_contain_text("HEALTHY", timeout=30_000)
+            shot("08-bot-running")
+            page.get_by_test_id("bot-stop").click()
+            page.get_by_role("alert").get_by_role("button", name="Stop").click()
+            expect(page.get_by_test_id("bot-status")).to_contain_text("STOPPED", timeout=10_000)
+            expect(page.get_by_role("alert")).to_have_count(0, timeout=5_000)
+            page.get_by_role("tab", name="Logs").click()
+            expect(page.get_by_test_id("bot-feed")).to_contain_text("Stopped by user")
+            shot("08b-bot-logs")
             page.go_back()
             page.go_back()
             expect(page.get_by_role("heading", name="My Bots")).to_be_visible()
-            expect(page.get_by_text("NIFTY Momentum CE")).to_be_visible(timeout=10_000)
+            page.get_by_role("tab", name=re.compile("Stopped")).click()
+            expect(page.get_by_role("button", name=re.compile(r"^NIFTY .* (CE|PE), STOPPED"))).to_be_visible(timeout=10_000)
             shot("09-my-bots")
 
             # Portfolio -> Risk Center -> kill switch.

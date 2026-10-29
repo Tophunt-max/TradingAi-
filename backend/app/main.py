@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +23,20 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging("DEBUG" if settings.debug else "INFO")
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):  # type: ignore[no-untyped-def]
+        if settings.bot_worker_embedded:
+            from app.workers import bot_runner
+
+            bot_runner.start_embedded(settings.bot_worker_interval_seconds)
+        yield
+        if settings.bot_worker_embedded:
+            from app.workers import bot_runner
+
+            bot_runner.stop_embedded()
+
     app = FastAPI(
+        lifespan=lifespan,
         title=settings.app_name,
         version="0.1.0",
         description=(

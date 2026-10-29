@@ -22,7 +22,7 @@ export default function AiCreate() {
   const save = useSaveBot();
   const strategies = useStrategies();
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ underlying: 'NIFTY', style: 'AUTO', timeframe: '5m', option_type: 'CE', capital: '', risk_profile: 'CONSERVATIVE' });
+  const [form, setForm] = useState({ underlying: 'NIFTY', style: 'AUTO', timeframe: '5m', option_type: 'AUTO', capital: '', risk_profile: 'CONSERVATIVE' });
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   const capital = form.capital || String(Number(risk.data?.limits.capital ?? 10000));
 
@@ -40,9 +40,10 @@ export default function AiCreate() {
           <ChipRow value={form.style} onChange={set('style')} options={STYLES} testIDPrefix="ai-style" />
           <AppText variant="label" tone="muted">TIMEFRAME</AppText>
           <ChipRow value={form.timeframe} onChange={set('timeframe')} options={['1m', '3m', '5m', '15m'].map((t) => ({ value: t, label: t }))} />
-          <SegmentedControl value={form.option_type} onChange={set('option_type')} options={[{ value: 'CE', label: 'CE (Call)' }, { value: 'PE', label: 'PE (Put)' }]} />
+          <AppText variant="label" tone="muted">SIDE</AppText>
+          <SegmentedControl value={form.option_type} onChange={set('option_type')} options={[{ value: 'AUTO', label: 'Auto' }, { value: 'CE', label: 'CE (Call)' }, { value: 'PE', label: 'PE (Put)' }]} />
           <NoticeBanner tone="info">
-            This assistant builds a draft from rules and your risk limits. It does not analyse the market yet; that arrives with the AI engine in Phase 4.
+            Auto uses the analysis engine: the regime picks the strategy and the trend picks CE or PE. The choices come from transparent rules, not a machine-learning model, and every draft is checked against your global risk limits.
           </NoticeBanner>
           <Button title="Next" icon="arrow-forward" fullWidth onPress={() => setStep(1)} />
         </Card>
@@ -67,6 +68,9 @@ export default function AiCreate() {
         <>
           <Card>
             <CardHeader title="Why this configuration" subtitle={`Generator: ${draft.data.generator}`} />
+            {draft.data.analysis_regime ? (
+              <AppText variant="caption" tone="faint">Market now: {draft.data.analysis_regime.replace('_', ' ').toLowerCase()} regime · {String(draft.data.analysis_trend).toLowerCase()} trend</AppText>
+            ) : null}
             {draft.data.rationale.map((r) => <AppText key={r} tone="muted">• {r}</AppText>)}
           </Card>
           {draft.data.warnings.map((w) => <NoticeBanner key={w}>{w}</NoticeBanner>)}

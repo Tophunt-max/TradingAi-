@@ -53,6 +53,8 @@ class Bot(UUIDPkMixin, TimestampMixin, Base):
     mode: Mapped[TradingMode] = mapped_column(_enum(TradingMode, "trading_mode"),
                                               default=TradingMode.PAPER)
     current_version: Mapped[int] = mapped_column(default=1)
+    status_reason: Mapped[str | None] = mapped_column(String(200))
+    status_changed_at: Mapped[datetime | None]
 
     versions: Mapped[list[BotConfigVersion]] = relationship(
         back_populates="bot", cascade="all, delete-orphan", order_by="BotConfigVersion.version"
@@ -99,3 +101,86 @@ class RiskSettings(TimestampMixin, Base):
     square_off_time_ist: Mapped[str] = mapped_column(String(5), default="15:15")
     kill_switch_engaged: Mapped[bool] = mapped_column(default=False)
     kill_switch_changed_at: Mapped[datetime | None]
+
+
+# ------------------------------------------------------------------ Phase 5
+
+
+class BotRun(UUIDPkMixin, Base):
+    """One activation of a bot, pinned to the config version it started with.
+
+    status: RUNNING (evaluating), PAUSED, ENDED. A worker must hold the lease
+    (lease_owner/lease_until) to evaluate a run, so two workers never act on
+    the same bot at once.
+    """
+
+    __tablename__ = "bot_runs"
+    __table_args__ = (Index("ix_bot_runs_status", "status", "lease_until"),)
+
+    bot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bots.id", ondelete="CASCADE"),
+                                              index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    config_version: Mapped[int]
+    mode: Mapped[str] = mapped_column(String(16), default="SIGNAL_ONLY")
+    status: Mapped[str] = mapped_column(String(10), default="RUNNING")
+    started_at: Mapped[datetime] = mapped_column(default=utcnow)
+    ended_at: Mapped[datetime | None]
+    end_reason: Mapped[str | None] = mapped_column(String(200))
+    last_heartbeat_at: Mapped[datetime | None]
+    last_bar_ts: Mapped[datetime | None]
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    last_error_at: Mapped[datetime | None]
+    consecutive_errors: Mapped[int] = mapped_column(default=0)
+    signals_count: Mapped[int] = mapped_column(default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(80))
+    lease_until: Mapped[datetime | None]
+
+
+class BotSignal(UUIDPkMixin, Base):
+    """An entry signal produced by a running bot. No order is placed in SIGNAL_ONLY mode."""
+
+    __tablename__ = "bot_signals"
+    __table_args__ = (
+        UniqueConstraint("run_id", "bar_ts", name="uq_bot_signals_run_bar"),
+        Index("ix_bot_signals_user_bar", "user_id", "bar_ts"),
+    )
+
+    bot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bots.id", ondelete="CASCADE"),
+                                              index=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bot_runs.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    config_version: Mapped[int]
+    bar_ts: Mapped[datetime]
+    side: Mapped[str] = mapped_column(String(2))
+    underlying: Mapped[str] = mapped_column(String(32))
+    timeframe: Mapped[str] = mapped_column(String(8))
+    price: Mapped[Decimal] = mapped_column(Money)
+    regime: Mapped[str | None] = mapped_column(String(20))
+    conditions: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    data_source: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow, server_default=func.now())
+
+
+class BotEvent(UUIDPkMixin, Base):
+    """Bot log: state changes, signals, suppressed signals, errors."""
+
+    __tablename__ = "bot_events"
+    __table_args__ = (Index("ix_bot_events_bot_ts", "bot_id", "ts"),)
+
+    bot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bots.id", ondelete="CASCADE"))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bot_runs.id",
+                                                                ondelete="SET NULL"))
+    ts: Mapped[datetime] = mapped_column(default=utcnow)
+    level: Mapped[str] = mapped_column(String(8))  # INFO | WARN | ERROR
+    kind: Mapped[str] = mapped_column(String(16))  # STATE | SIGNAL | SUPPRESSED | ERROR
+    message: Mapped[str] = mapped_column(String(500))
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class WorkerHeartbeat(Base):
+    __tablename__ = "worker_heartbeats"
+
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    instance: Mapped[str] = mapped_column(String(80))
+    last_seen: Mapped[datetime]
+    info: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

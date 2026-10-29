@@ -12,9 +12,13 @@ from app.models.bots import (
     Bot,
     BotConfigVersion,
     BotCreationMethod,
+    BotEvent,
+    BotRun,
+    BotSignal,
     BotStatus,
     RiskSettings,
     TradingMode,
+    WorkerHeartbeat,
 )
 from app.models.instruments import Instrument, InstrumentSync
 from app.models.ml import ModelVersion, Prediction
@@ -29,6 +33,10 @@ __all__ = [
     "Bot",
     "BotConfigVersion",
     "BotCreationMethod",
+    "BotEvent",
+    "BotRun",
+    "BotSignal",
+    "WorkerHeartbeat",
     "BotStatus",
     "RiskSettings",
     "TradingMode",

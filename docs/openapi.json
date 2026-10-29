@@ -1847,12 +1847,14 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BotDetail"
+                }
               }
             }
           },
           "409": {
-            "description": "Not available"
+            "description": "Invalid state or failed checks"
           },
           "422": {
             "description": "Validation Error",
@@ -1896,12 +1898,14 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BotDetail"
+                }
               }
             }
           },
           "409": {
-            "description": "Not available"
+            "description": "Invalid state or failed checks"
           },
           "422": {
             "description": "Validation Error",
@@ -1945,12 +1949,14 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BotDetail"
+                }
               }
             }
           },
           "409": {
-            "description": "Not available"
+            "description": "Invalid state or failed checks"
           },
           "422": {
             "description": "Validation Error",
@@ -1994,12 +2000,194 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/BotDetail"
+                }
               }
             }
           },
           "409": {
-            "description": "Not available"
+            "description": "Invalid state or failed checks"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots/{bot_id}/signals": {
+      "get": {
+        "tags": [
+          "bots"
+        ],
+        "summary": "Bot Signals",
+        "operationId": "bot_signals_api_v1_bots__bot_id__signals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bot Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BotSignalOut"
+                  },
+                  "title": "Response Bot Signals Api V1 Bots  Bot Id  Signals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots/{bot_id}/events": {
+      "get": {
+        "tags": [
+          "bots"
+        ],
+        "summary": "Bot Events",
+        "operationId": "bot_events_api_v1_bots__bot_id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bot Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BotEventOut"
+                  },
+                  "title": "Response Bot Events Api V1 Bots  Bot Id  Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots/{bot_id}/runs": {
+      "get": {
+        "tags": [
+          "bots"
+        ],
+        "summary": "Bot Runs",
+        "operationId": "bot_runs_api_v1_bots__bot_id__runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BotRunOut"
+                  },
+                  "title": "Response Bot Runs Api V1 Bots  Bot Id  Runs Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2338,6 +2526,7 @@
                 {
                   "enum": [
                     "TRADES",
+                    "SIGNALS",
                     "BOTS",
                     "RISK",
                     "SECURITY",
@@ -2808,7 +2997,8 @@
             "type": "string",
             "enum": [
               "CE",
-              "PE"
+              "PE",
+              "AUTO"
             ],
             "title": "Option Type",
             "default": "CE"
@@ -2845,6 +3035,28 @@
             },
             "type": "array",
             "title": "Warnings"
+          },
+          "analysis_regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Regime"
+          },
+          "analysis_trend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Trend"
           }
         },
         "additionalProperties": false,
@@ -2867,6 +3079,7 @@
             "type": "string",
             "enum": [
               "TRADES",
+              "SIGNALS",
               "BOTS",
               "RISK",
               "SECURITY",
@@ -3588,10 +3801,71 @@
             ],
             "title": "Last Signal"
           },
+          "last_signal_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Signal At"
+          },
+          "signals_today": {
+            "type": "integer",
+            "title": "Signals Today",
+            "default": 0
+          },
           "health": {
             "type": "string",
             "title": "Health",
             "default": "NOT_RUNNING"
+          },
+          "health_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Detail"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "status_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed At"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BotRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "config": {
             "$ref": "#/components/schemas/BotConfig-Output"
@@ -3623,6 +3897,61 @@
           "versions"
         ],
         "title": "BotDetail"
+      },
+      "BotEventOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "ts",
+          "level",
+          "kind",
+          "message",
+          "data"
+        ],
+        "title": "BotEventOut"
       },
       "BotOut": {
         "properties": {
@@ -3712,10 +4041,71 @@
             ],
             "title": "Last Signal"
           },
+          "last_signal_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Signal At"
+          },
+          "signals_today": {
+            "type": "integer",
+            "title": "Signals Today",
+            "default": 0
+          },
           "health": {
             "type": "string",
             "title": "Health",
             "default": "NOT_RUNNING"
+          },
+          "health_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Detail"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "status_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed At"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BotRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -3735,6 +4125,212 @@
           "updated_at"
         ],
         "title": "BotOut"
+      },
+      "BotRunOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "config_version": {
+            "type": "integer",
+            "title": "Config Version"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "last_bar_ts": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Bar Ts"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_error_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error At"
+          },
+          "consecutive_errors": {
+            "type": "integer",
+            "title": "Consecutive Errors"
+          },
+          "signals_count": {
+            "type": "integer",
+            "title": "Signals Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "config_version",
+          "mode",
+          "status",
+          "started_at",
+          "ended_at",
+          "end_reason",
+          "last_heartbeat_at",
+          "last_bar_ts",
+          "last_error",
+          "last_error_at",
+          "consecutive_errors",
+          "signals_count"
+        ],
+        "title": "BotRunOut"
+      },
+      "BotSignalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "config_version": {
+            "type": "integer",
+            "title": "Config Version"
+          },
+          "bar_ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bar Ts"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "underlying": {
+            "type": "string",
+            "title": "Underlying"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "price": {
+            "type": "string",
+            "title": "Price"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "conditions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Conditions"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "config_version",
+          "bar_ts",
+          "side",
+          "underlying",
+          "timeframe",
+          "price",
+          "regime",
+          "conditions",
+          "data_source",
+          "created_at"
+        ],
+        "title": "BotSignalOut"
       },
       "BotStatus": {
         "type": "string",
@@ -7122,6 +7718,15 @@
             },
             "type": "array",
             "title": "Default Entry"
+          },
+          "default_entry_pe": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Default Entry Pe",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -7537,6 +8142,15 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "required_for": {
+            "type": "string",
+            "enum": [
+              "ACTIVATION",
+              "ORDERS"
+            ],
+            "title": "Required For",
+            "default": "ACTIVATION"
           }
         },
         "additionalProperties": false,
@@ -7603,6 +8217,17 @@
           "can_activate": {
             "type": "boolean",
             "title": "Can Activate"
+          },
+          "activation_mode": {
+            "type": "string",
+            "const": "SIGNAL_ONLY",
+            "title": "Activation Mode",
+            "default": "SIGNAL_ONLY"
+          },
+          "can_place_orders": {
+            "type": "boolean",
+            "title": "Can Place Orders",
+            "default": false
           },
           "checks": {
             "items": {

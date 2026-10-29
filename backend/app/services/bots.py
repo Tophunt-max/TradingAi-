@@ -5,16 +5,27 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, time
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.bots.lifecycle import latest_run
 from app.core.config import MarketDataMode, Settings
 from app.core.errors import ConflictError, NotFoundError
 from app.core.time import IST, utcnow
 from app.market_data.factory import build_provider
-from app.models.bots import Bot, BotConfigVersion, BotCreationMethod, RiskSettings
+from app.models.bots import (
+    Bot,
+    BotConfigVersion,
+    BotCreationMethod,
+    BotRun,
+    BotSignal,
+    BotStatus,
+    RiskSettings,
+)
 from app.models.instruments import Instrument
 from app.schemas.bots import (
     AiDraftRequest,
@@ -22,10 +33,13 @@ from app.schemas.bots import (
     BotConfig,
     BotDetail,
     BotOut,
+    BotRunOut,
     ValidationCheck,
     ValidationReport,
 )
 from app.strategies.catalog import STRATEGIES
+from app.strategies.conditions import mirror
+from app.strategies.conditions import supported as cond_supported
 
 MAX_BOTS_PER_USER = 50
 
@@ -43,14 +57,54 @@ def inr(value: Decimal) -> str:
     return f"{sign}₹{digits}" + (f".{int(frac * 100):02d}" if frac else "")
 
 
-def to_out(bot: Bot) -> BotOut:
-    return BotOut(
+WORKER_STALE_SECONDS = 120
+
+
+def _health(bot: Bot, run: BotRun | None, kill_switch: bool) -> tuple[str, str | None]:
+    if bot.status == BotStatus.PAUSED:
+        return "PAUSED", bot.status_reason
+    if bot.status != BotStatus.ACTIVE:
+        return "NOT_RUNNING", None
+    if run is None:
+        return "ERROR", "Active without a run record."
+    if kill_switch:
+        return "BLOCKED", "Kill switch engaged: signals are suppressed."
+    if run.consecutive_errors:
+        return "ERROR", run.last_error
+    if run.last_heartbeat_at is None:
+        return "WAITING_FOR_WORKER", "No worker has evaluated this bot yet."
+    age = (utcnow() - run.last_heartbeat_at).total_seconds()
+    if age > WORKER_STALE_SECONDS:
+        return "STALE", f"Last evaluated {int(age)} s ago: is the bot worker running?"
+    last = f"{run.last_bar_ts.astimezone(IST):%d %b %H:%M} IST" if run.last_bar_ts else "—"
+    return "OK", f"Evaluating each closed candle; last candle {last}."
+
+
+def to_out(bot: Bot, db: Session | None = None) -> BotOut:
+    out = BotOut(
         id=bot.id, name=bot.name, strategy_id=bot.strategy_id,
         strategy_name=STRATEGIES[bot.strategy_id]["name"], underlying=bot.underlying,
         timeframe=bot.timeframe, creation_method=bot.creation_method, status=bot.status,
         mode=bot.mode, current_version=bot.current_version, created_at=bot.created_at,
-        updated_at=bot.updated_at,
+        updated_at=bot.updated_at, status_reason=bot.status_reason,
+        status_changed_at=bot.status_changed_at,
     )
+    if db is None:
+        return out
+    run = latest_run(db, bot.id)
+    rs = db.get(RiskSettings, bot.user_id)
+    out.health, out.health_detail = _health(bot, run if run and run.status != "ENDED" else None,
+                                            bool(rs and rs.kill_switch_engaged))
+    out.run = BotRunOut.model_validate(run) if run else None
+    last = db.scalar(select(BotSignal).where(BotSignal.bot_id == bot.id)
+                     .order_by(BotSignal.bar_ts.desc()).limit(1))
+    if last:
+        out.last_signal = f"{last.side} at {last.price:.2f}"
+        out.last_signal_at = last.bar_ts
+        day0 = datetime.combine(utcnow().astimezone(IST).date(), time(0), IST)
+        out.signals_today = db.scalar(select(func.count()).select_from(BotSignal).where(
+            BotSignal.bot_id == bot.id, BotSignal.bar_ts >= day0)) or 0
+    return out
 
 
 def current_config(bot: Bot) -> BotConfig:
@@ -58,8 +112,8 @@ def current_config(bot: Bot) -> BotConfig:
     return BotConfig.model_validate(v.config)
 
 
-def to_detail(bot: Bot) -> BotDetail:
-    return BotDetail(**to_out(bot).model_dump(), config=current_config(bot),
+def to_detail(bot: Bot, db: Session | None = None) -> BotDetail:
+    return BotDetail(**to_out(bot, db).model_dump(), config=current_config(bot),
                      versions=[v.version for v in bot.versions])
 
 
@@ -146,9 +200,11 @@ def validate(
     market = market or MarketContext(mode="DEMO")
     checks: list[ValidationCheck] = []
 
-    def add(key: str, label: str, ok: bool | None, message: str) -> None:
+    def add(key: str, label: str, ok: bool | None, message: str,
+            required_for: str = "ACTIVATION") -> None:
         status = "PASS" if ok else "WARN" if ok is None else "FAIL"
-        checks.append(ValidationCheck(key=key, label=label, status=status, message=message))
+        checks.append(ValidationCheck(key=key, label=label, status=status, message=message,
+                                      required_for=required_for))
 
     strat = STRATEGIES[cfg.strategy_id]
     add("strategy", "Strategy compatibility", not strat["research_only"],
@@ -160,27 +216,37 @@ def validate(
              f"({', '.join(strat['timeframes'])}).")
     add("instrument", "Instrument eligibility", True,
         f"{cfg.instrument.underlying} {cfg.instrument.option_type} options buying.")
+    conds = [c.model_dump() for c in cfg.entry.conditions]
+    problems = [p for p in (cond_supported(c) for c in conds) if p]
+    if not conds:
+        add("conditions", "Entry conditions", False, "Add at least one entry condition.")
+    else:
+        add("conditions", "Entry conditions", not problems,
+            "; ".join(problems) if problems else
+            f"{len(conds)} condition(s), {'all' if cfg.entry.logic == 'ALL' else 'any'} must "
+            "match, evaluated on each closed candle.")
     c = market.contract
     if c is not None:
         add("contract", "Contract, lot and tick size", True,
             f"Nearest expiry {c.expiry_date:%d %b %Y}: lot size {c.lot_size}, tick size "
             f"{c.tick_size.normalize() if c.tick_size is not None else 'unknown'} "
-            "(INDstocks instrument master).")
+            "(INDstocks instrument master).", "ORDERS")
     elif market.mode == "INDSTOCKS":
         add("contract", "Contract, lot and tick size", False,
-            "No current contract found in the instrument master. Run an instrument sync.")
+            "No current contract found in the instrument master. Run an instrument sync.",
+            "ORDERS")
     else:
         add("contract", "Contract, lot and tick size", False,
             "DEMO mode has no instrument master, so lot size, tick size and expiry cannot be "
-            "verified.")
+            "verified.", "ORDERS")
     if market.mode == "INDSTOCKS":
         add("data", "Market data", market.provider_ok,
             "INDstocks data is available." if market.provider_ok
-            else f"INDstocks is not usable: {market.provider_detail}.")
+            else f"INDstocks is not usable: {market.provider_detail}.", "ORDERS")
     else:
         add("data", "Market data", False,
             "Only synthetic DEMO data is available. Trading decisions need a live, authorised "
-            "feed.")
+            "feed. Signals on DEMO data are for testing only.", "ORDERS")
     add("capital", "Capital allocation", cfg.risk.capital_allocation <= rs.capital,
         f"{inr(cfg.risk.capital_allocation)} of {inr(rs.capital)} global capital."
         if cfg.risk.capital_allocation <= rs.capital
@@ -210,20 +276,28 @@ def validate(
     add("kill_switch", "Kill switch", not rs.kill_switch_engaged,
         "Engaged: new entries are blocked." if rs.kill_switch_engaged else "Not engaged.")
     add("broker", "Broker permissions", None,
-        "Paper mode only; no broker is required. Live trading is locked.")
+        "Paper mode only; no broker is required. Live trading is locked.", "ORDERS")
     add("engine", "Execution engine", False,
-        "The paper execution engine and global risk manager arrive in Phase 6.")
+        "The paper execution engine and global risk manager arrive in Phase 6. Until then the "
+        "bot runs in signal-only mode and places no orders.", "ORDERS")
 
+    activation = [c for c in checks if c.required_for == "ACTIVATION"]
     return ValidationReport(
         bot_id=bot.id, version=bot.current_version,
-        can_activate=all(c.status != "FAIL" for c in checks), checks=checks,
+        can_activate=all(c.status != "FAIL" for c in activation),
+        activation_mode="SIGNAL_ONLY",
+        can_place_orders=all(c.status != "FAIL" for c in checks),
+        checks=checks,
     )
 
 
 _STYLE_TO_STRATEGY = {
     "MOMENTUM": "momentum", "SCALPING": "scalping", "BREAKOUT": "breakout",
-    "REVERSAL": "reversal", "SMC": "smc", "AUTO": "momentum",
+    "REVERSAL": "reversal", "SMC": "smc",
 }
+# Regime family -> strategy designed for it (used by AUTO style).
+_REGIME_TO_STRATEGY = {"TRENDING": "momentum", "RANGE_EXPANSION": "breakout", "RANGE": "reversal",
+                       "VOLATILE": "smc"}
 _PROFILE = {
     # (fraction of global risk per trade, stop %, target %, entries)
     "CONSERVATIVE": (Decimal("0.6"), Decimal("20"), Decimal("30"), 1),
@@ -232,21 +306,69 @@ _PROFILE = {
 }
 
 
-def ai_draft(req: AiDraftRequest, rs: RiskSettings) -> AiDraftResponse:
-    """Rule-based draft generator. No AI model is involved yet."""
-    strategy_id = _STYLE_TO_STRATEGY[req.style]
+def ai_draft(req: AiDraftRequest, rs: RiskSettings,
+             analysis: dict[str, Any] | None = None) -> AiDraftResponse:
+    """Draft from the analysis engine (regime + trend) and the user's risk limits.
+
+    Rules decide everything; no ML model chooses the configuration.
+    """
+    rationale: list[str] = []
+    warnings: list[str] = []
+    regime = (analysis or {}).get("regime")
+    trend = (analysis or {}).get("trend")
+    if analysis:
+        rationale.append(
+            f"{req.underlying} {analysis['timeframe']}: "
+            f"{regime['label'].replace('_', ' ').lower() if regime else 'unknown'} regime, "
+            f"{(trend or 'unknown').lower()} trend reading ({analysis['source']} data).")
+        if analysis["source"] == "DEMO":
+            warnings.append("Market analysis used synthetic DEMO data.")
+    else:
+        warnings.append("Market analysis was unavailable, so style and side defaults were used.")
+
+    if req.style == "AUTO":
+        fam = regime["family"] if regime else None
+        strategy_id = _REGIME_TO_STRATEGY.get(fam or "", "momentum")
+        rationale.append(f"Strategy: {STRATEGIES[strategy_id]['name']}, designed for the "
+                         f"{(fam or 'unknown').lower()} regime.")
+        if fam == "VOLATILE":
+            warnings.append("Volatility is unusually high; consider waiting for calmer conditions.")
+    else:
+        strategy_id = _STYLE_TO_STRATEGY[req.style]
+        rationale.append(f"Strategy: {STRATEGIES[strategy_id]['name']} (your chosen style).")
+        if regime and not ("ANY" in STRATEGIES[strategy_id]["regimes"]
+                           or regime["family"] in STRATEGIES[strategy_id]["regimes"]):
+            warnings.append(f"The current {regime['label'].replace('_', ' ').lower()} regime is "
+                            f"outside this strategy's design.")
     strat = STRATEGIES[strategy_id]
+
+    if req.option_type == "AUTO":
+        label = regime["label"] if regime else None
+        side = ("CE" if label == "TRENDING_UP" else "PE" if label == "TRENDING_DOWN"
+                else "PE" if trend == "BEARISH" else "CE")
+        basis = "regime" if label in ("TRENDING_UP", "TRENDING_DOWN") else "trend reading"
+        rationale.append(f"Side: {side}, from the {basis}.")
+        if trend in (None, "SIDEWAYS") and label not in ("TRENDING_UP", "TRENDING_DOWN"):
+            warnings.append("No clear direction: the side defaulted to CE. Review it.")
+    else:
+        side = req.option_type
+
     frac, sl, tgt, entries = _PROFILE[req.risk_profile]
     capital = min(req.capital, rs.capital)
     risk_per_trade = min(rs.max_risk_per_trade * frac, capital).quantize(Decimal("1"))
     timeframe = req.timeframe if req.timeframe in strat["timeframes"] else strat["timeframes"][0]
+    if timeframe != req.timeframe:
+        warnings.append(f"Timeframe changed to {timeframe}: {strat['name']} is designed for "
+                        f"{', '.join(strat['timeframes'])}.")
+    conditions = strat["default_entry"] if side == "CE" else [
+        mirror(c) for c in strat["default_entry"]]
     cfg = BotConfig.model_validate({
-        "name": f"{req.underlying} {strat['name']} {req.option_type}",
+        "name": f"{req.underlying} {strat['name']} {side}",
         "description": f"Draft from AI Auto Create ({req.risk_profile.lower()} profile).",
         "strategy_id": strategy_id,
         "timeframe": timeframe,
-        "instrument": {"underlying": req.underlying, "option_type": req.option_type},
-        "entry": {"logic": "ALL", "conditions": strat["default_entry"]},
+        "instrument": {"underlying": req.underlying, "option_type": side},
+        "entry": {"logic": "ALL", "conditions": conditions},
         "exit": {"stop_loss": {"type": "PERCENT", "value": sl},
                  "target": {"type": "PERCENT", "value": tgt},
                  "square_off_time_ist": rs.square_off_time_ist},
@@ -254,20 +376,18 @@ def ai_draft(req: AiDraftRequest, rs: RiskSettings) -> AiDraftResponse:
                  "max_entries_per_day": min(entries, rs.max_entries_per_day),
                  "max_open_positions": 1},
     })
-    rationale = [
-        f"Strategy: {strat['name']} (chosen from your '{req.style.lower()}' style).",
+    rationale += [
         f"Timeframe {timeframe}.",
         f"Risk per trade {inr(risk_per_trade)}: {int(frac * 100)}% of your global maximum "
         f"{inr(rs.max_risk_per_trade)}.",
         f"Option premium stop-loss {sl}% and target {tgt}%.",
     ]
-    warnings = [
-        "Generated by rules, not an AI model. Market analysis is not used until Phase 4.",
+    warnings += [
+        "Chosen by rules from the analysis engine, not by a machine-learning model.",
         "Review every field. The independent risk manager will still validate it.",
     ]
-    if req.style == "AUTO":
-        warnings.append("AUTO has no regime detector yet, so it defaults to Momentum.")
     if req.capital > rs.capital:
         warnings.append(f"Capital was capped at your global capital of {inr(rs.capital)}.")
-    return AiDraftResponse(generator="rule-based-v1", config=cfg, rationale=rationale,
-                           warnings=warnings)
+    return AiDraftResponse(generator="analysis-rules-v2", config=cfg, rationale=rationale,
+                           warnings=warnings, analysis_regime=regime["label"] if regime else None,
+                           analysis_trend=trend)

@@ -11,6 +11,7 @@ import { INDICATORS, OPERATORS, TIMEFRAMES, blankConfig, describeCondition, setI
 import { useBot, useRisk, useSaveBot, useStrategies } from '../../../features/trading/api';
 
 const STEPS = ['Basic', 'Strategy', 'Entry', 'Exit', 'Risk', 'Review'];
+const c0 = (s, side) => (side === 'PE' ? s.default_entry_pe ?? [] : s.default_entry);
 
 function LevelField({ label, value, onChange, allowOff }) {
   return (
@@ -85,7 +86,19 @@ function Builder({ initial, botId, strategies, limits, creationMethod }) {
           <TextField label="Bot name" value={cfg.name} onChangeText={set(['name'])} testID="bot-name" />
           <TextField label="Description (optional)" value={cfg.description ?? ''} onChangeText={set(['description'])} multiline />
           <Select label="Instrument" value={cfg.instrument.underlying} onChange={set(['instrument', 'underlying'])} options={[{ value: 'NIFTY', label: 'NIFTY 50 options' }, { value: 'BANKNIFTY', label: 'BANKNIFTY options' }]} />
-          <SegmentedControl value={cfg.instrument.option_type} onChange={set(['instrument', 'option_type'])} options={[{ value: 'CE', label: 'CE (Call)' }, { value: 'PE', label: 'PE (Put)' }]} />
+          <SegmentedControl
+            value={cfg.instrument.option_type}
+            onChange={(side) =>
+              setCfg((c) => {
+                const s = strategies.find((x) => x.id === c.strategy_id);
+                const fromDefaults = s && JSON.stringify(c.entry.conditions) === JSON.stringify(c.instrument.option_type === 'PE' ? s.default_entry_pe : s.default_entry);
+                const next = setIn(c, ['instrument', 'option_type'], side);
+                // Swap to the mirrored template conditions unless the user customised them.
+                return fromDefaults ? setIn(next, ['entry', 'conditions'], side === 'PE' ? s.default_entry_pe : s.default_entry) : next;
+              })
+            }
+            options={[{ value: 'CE', label: 'CE (Call)' }, { value: 'PE', label: 'PE (Put)' }]}
+          />
           <Select label="Strike" value={cfg.instrument.strike_selection} onChange={set(['instrument', 'strike_selection'])} options={[{ value: 'ATM', label: 'At the money' }, { value: 'ITM_1', label: '1 strike in the money' }, { value: 'OTM_1', label: '1 strike out of the money' }, { value: 'OTM_2', label: '2 strikes out of the money' }]} />
           <Select label="Expiry" value={cfg.instrument.expiry_selection} onChange={set(['instrument', 'expiry_selection'])} options={[{ value: 'NEAREST', label: 'Nearest expiry' }, { value: 'NEXT', label: 'Next expiry' }]} />
           <AppText variant="caption" tone="faint">Options buying only. Selling and unlimited-risk strategies are not supported.</AppText>
@@ -98,7 +111,8 @@ function Builder({ initial, botId, strategies, limits, creationMethod }) {
             value={cfg.strategy_id}
             onChange={(id) => {
               const s = strategies.find((x) => x.id === id);
-              setCfg((c) => ({ ...c, strategy_id: id, timeframe: s.timeframes.includes(c.timeframe) ? c.timeframe : s.timeframes[0], entry: { ...c.entry, conditions: s.default_entry.length ? s.default_entry : c.entry.conditions } }));
+              const defaults = c0(s, cfg.instrument.option_type);
+              setCfg((c) => ({ ...c, strategy_id: id, timeframe: s.timeframes.includes(c.timeframe) ? c.timeframe : s.timeframes[0], entry: { ...c.entry, conditions: defaults.length ? defaults : c.entry.conditions } }));
             }}
             options={strategies.map((s) => ({ value: s.id, label: s.name }))}
           />

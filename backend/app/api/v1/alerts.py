@@ -15,10 +15,11 @@ from sqlalchemy import select
 
 from app.api.deps import AuthDep, DbDep
 from app.models.audit import AuditLog
+from app.models.bots import Bot, BotEvent, BotSignal
 
 router = APIRouter(tags=["alerts"])
 
-Category = Literal["TRADES", "BOTS", "RISK", "SECURITY", "SYSTEM"]
+Category = Literal["TRADES", "SIGNALS", "BOTS", "RISK", "SECURITY", "SYSTEM"]
 
 _MAP: dict[str, tuple[Category, str, str]] = {
     "auth.session_created": ("SECURITY", "New sign-in", "info"),
@@ -30,7 +31,10 @@ _MAP: dict[str, tuple[Category, str, str]] = {
     "bot.updated": ("BOTS", "Bot configuration updated", "info"),
     "bot.cloned": ("BOTS", "Bot cloned", "info"),
     "bot.deleted": ("BOTS", "Bot deleted", "info"),
-    "bot.start": ("BOTS", "Bot start rejected: engine unavailable", "warning"),
+    "bot.start": ("BOTS", "Bot started (signal-only)", "info"),
+    "bot.pause": ("BOTS", "Bot paused", "info"),
+    "bot.resume": ("BOTS", "Bot resumed", "info"),
+    "bot.stop": ("BOTS", "Bot stopped", "info"),
     "risk.limits_updated": ("RISK", "Risk limits changed", "warning"),
     "risk.kill_switch_engaged": ("RISK", "Kill switch engaged", "critical"),
     "risk.kill_switch_released": ("RISK", "Kill switch released", "warning"),
@@ -63,6 +67,8 @@ def alerts(
         if r.action == "auth.session_created" and r.outcome != "SUCCESS":
             continue
         cat, title, sev = _MAP[r.action]
+        if r.action.startswith("bot.") and r.outcome == "REJECTED":
+            title, sev = f"{title.split(' (')[0]} rejected by activation checks", "warning"
         if category and cat != category:
             continue
         body = None
@@ -74,7 +80,27 @@ def alerts(
                             created_at=r.created_at))
         if len(out) >= limit:
             break
-    return out
+    if category in (None, "SIGNALS"):
+        sigs = db.execute(
+            select(BotSignal, Bot.name).join(Bot, Bot.id == BotSignal.bot_id)
+            .where(BotSignal.user_id == ctx.user.id)
+            .order_by(BotSignal.created_at.desc()).limit(limit)).all()
+        out += [AlertOut(id=str(sg.id), category="SIGNALS", severity="info",
+                         title=f"{sg.side} signal: {name}",
+                         body=f"{sg.underlying} {sg.timeframe} at {sg.price:.2f}"
+                              + (" (DEMO data)" if sg.data_source == "DEMO" else "")
+                              + ". Signal-only: no order placed.",
+                         created_at=sg.created_at) for sg, name in sigs]
+    if category in (None, "BOTS"):
+        errs = db.execute(
+            select(BotEvent, Bot.name).join(Bot, Bot.id == BotEvent.bot_id)
+            .where(Bot.user_id == ctx.user.id, BotEvent.level == "ERROR")
+            .order_by(BotEvent.ts.desc()).limit(limit)).all()
+        out += [AlertOut(id=str(e.id), category="BOTS", severity="warning",
+                         title=f"Bot error: {name}", body=e.message, created_at=e.ts)
+                for e, name in errs]
+    out.sort(key=lambda a: a.created_at, reverse=True)
+    return out[:limit]
 
 
 class BrokerOut(BaseModel):

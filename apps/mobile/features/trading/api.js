@@ -3,11 +3,26 @@ import { api } from '../../store/auth';
 
 // ---- Bots -----------------------------------------------------------------
 export function useBots() {
-  return useQuery({ queryKey: ['bots'], queryFn: () => api.get('/api/v1/bots') });
+  return useQuery({ queryKey: ['bots'], queryFn: () => api.get('/api/v1/bots'), refetchInterval: 15_000 });
 }
 
 export function useBot(id) {
-  return useQuery({ queryKey: ['bot', id], queryFn: () => api.get(`/api/v1/bots/${id}`), enabled: !!id });
+  return useQuery({
+    queryKey: ['bot', id],
+    queryFn: () => api.get(`/api/v1/bots/${id}`),
+    enabled: !!id,
+    // Running bots change as the worker evaluates candles.
+    refetchInterval: (q) => (q.state.data?.status === 'ACTIVE' ? 5_000 : false),
+  });
+}
+
+export function useBotFeed(id, kind) {
+  return useQuery({
+    queryKey: ['bot', id, kind],
+    queryFn: () => api.get(`/api/v1/bots/${id}/${kind}`),
+    enabled: !!id,
+    refetchInterval: 10_000,
+  });
 }
 
 export function useStrategies() {
@@ -41,6 +56,7 @@ export function useBotAction() {
       qc.invalidateQueries({ queryKey: ['bots'] });
       qc.invalidateQueries({ queryKey: ['bot', id] });
       qc.invalidateQueries({ queryKey: ['alerts'] });
+      qc.invalidateQueries({ queryKey: ['risk'] });
     },
   });
 }

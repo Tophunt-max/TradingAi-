@@ -121,12 +121,13 @@ def test_validation_uses_global_limits_and_blocks_activation(client, h):
                       json={"creation_method": "MANUAL", "config": cfg}).json()
     report = client.post(f"/api/v1/bots/{bot['id']}/validate", headers=h).json()
     checks = {c["key"]: c["status"] for c in report["checks"]}
-    assert report["can_activate"] is False
+    assert report["can_activate"] is False and report["can_place_orders"] is False
     assert checks["entries"] == "FAIL" and checks["risk_per_trade"] == "FAIL"
     assert checks["contract"] == "FAIL" and checks["engine"] == "FAIL" and checks["data"] == "FAIL"
 
     r = client.post(f"/api/v1/bots/{bot['id']}/start", headers=h)
-    assert r.status_code == 409 and r.json()["error"]["code"] == "EXECUTION_UNAVAILABLE"
+    assert r.status_code == 409 and r.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert "Entries per day" in r.json()["error"]["message"]
     assert client.get(f"/api/v1/bots/{bot['id']}", headers=h).json()["status"] == "DRAFT"
 
 
@@ -144,10 +145,11 @@ def test_ai_draft_respects_global_risk(client, h):
         "risk_profile": "AGGRESSIVE"})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["generator"] == "rule-based-v1"
+    assert body["generator"] == "analysis-rules-v2"
     assert float(body["config"]["risk"]["capital_allocation"]) == 10000
     assert float(body["config"]["risk"]["risk_per_trade"]) <= 250
-    assert any("not an AI model" in w for w in body["warnings"])
+    assert any("not by a machine-learning model" in w for w in body["warnings"])
+    assert body["analysis_regime"]  # AUTO style uses the analysis engine
     r = client.post("/api/v1/bots", headers=h,
                     json={"creation_method": "AI", "config": body["config"]})
     assert r.status_code == 201

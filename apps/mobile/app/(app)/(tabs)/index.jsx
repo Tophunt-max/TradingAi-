@@ -83,7 +83,15 @@ function RiskAndBotsCard() {
       <KeyValue label="Daily loss limit used" value={r ? `${formatINR(0)} / ${formatINR(r.limits.daily_loss_limit)}` : '—'} />
       <KeyValue label="Entries used" value={r ? `${r.usage.entries_used} / ${r.limits.max_entries_per_day}` : '—'} />
       <KeyValue label="Kill switch" value={r ? (r.limits.kill_switch_engaged ? 'ENGAGED' : 'Off') : '—'} tone={r?.limits.kill_switch_engaged ? 'negative' : undefined} />
-      <KeyValue label="Bots" value={bots.data ? `${bots.data.length} (all drafts)` : '—'} />
+      <KeyValue
+        label="Bots"
+        value={bots.data ? `${bots.data.filter((b) => b.status === 'ACTIVE').length} active of ${bots.data.length}` : '—'}
+      />
+      <KeyValue
+        label="Bot health"
+        value={bots.data ? (bots.data.some((b) => ['ERROR', 'STALE', 'BLOCKED'].includes(b.health)) ? 'Needs attention' : 'OK') : '—'}
+        tone={bots.data?.some((b) => ['ERROR', 'STALE', 'BLOCKED'].includes(b.health)) ? 'warning' : undefined}
+      />
     </Card>
   );
 }

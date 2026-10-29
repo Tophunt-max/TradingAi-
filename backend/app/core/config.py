@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     # Exchange holidays (YYYY-MM-DD, comma-separated). Not bundled: must be maintained.
     market_holidays: Annotated[list[str], NoDecode] = []
 
+    # Bot worker. Production runs `python -m app.workers.bot_runner` as its own
+    # process; the embedded thread is a development convenience only.
+    bot_worker_embedded: bool = False
+    bot_worker_interval_seconds: float = Field(default=15.0, ge=1, le=300)
+
     # Verification-code delivery: "console" (development only) or "none".
     otp_delivery: str = "console"
 
@@ -123,6 +128,9 @@ class Settings(BaseSettings):
                 and not self.indstocks_access_token):
             raise ValueError(
                 "INDSTOCKS_ACCESS_TOKEN is required when MARKET_DATA_MODE=INDSTOCKS.")
+        if hardened and self.bot_worker_embedded:
+            raise ValueError("BOT_WORKER_EMBEDDED is for development only; run the worker "
+                             "as its own process.")
         if self.live_trading_enabled:
             raise ValueError(
                 "LIVE_TRADING_ENABLED cannot be true: no verified broker adapter is "
