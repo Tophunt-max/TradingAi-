@@ -135,3 +135,165 @@ def confirmed_pivots(
         ):
             pl.append((i, lo))
     return ph, pl
+
+
+# ---------------------------------------------------------------- Phase 4
+
+
+def sma_opt(values: Sequence[float | None], period: int) -> Series:
+    """SMA over a series that may start with None (warm-up)."""
+    out: Series = [None] * len(values)
+    window: list[float] = []
+    for i, v in enumerate(values):
+        if v is None:
+            window = []
+            continue
+        window.append(v)
+        if len(window) > period:
+            window.pop(0)
+        if len(window) == period:
+            out[i] = sum(window) / period
+    return out
+
+
+def vwap(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
+         volumes: Sequence[float], session_keys: Sequence[object]) -> Series:
+    """Session VWAP; resets whenever the session key (IST date) changes."""
+    out: Series = []
+    cum_pv = cum_v = 0.0
+    prev: object = object()
+    for h, lo, c, v, k in zip(highs, lows, closes, volumes, session_keys, strict=True):
+        if k != prev:
+            cum_pv = cum_v = 0.0
+            prev = k
+        cum_pv += (h + lo + c) / 3 * v
+        cum_v += v
+        out.append(cum_pv / cum_v if cum_v > 0 else None)
+    return out
+
+
+def supertrend(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
+               period: int = 10, mult: float = 3.0) -> tuple[Series, list[int | None]]:
+    """Supertrend line and direction (+1 up, -1 down)."""
+    a = atr(highs, lows, closes, period)
+    n = len(closes)
+    line: Series = [None] * n
+    direction: list[int | None] = [None] * n
+    fu = fl = None
+    trend = 1
+    for i in range(n):
+        if a[i] is None:
+            continue
+        hl2 = (highs[i] + lows[i]) / 2
+        bu, bl = hl2 + mult * a[i], hl2 - mult * a[i]
+        if fu is None or fl is None:
+            fu, fl = bu, bl
+        else:
+            fu = bu if bu < fu or closes[i - 1] > fu else fu
+            fl = bl if bl > fl or closes[i - 1] < fl else fl
+            if trend == 1 and closes[i] < fl:
+                trend = -1
+            elif trend == -1 and closes[i] > fu:
+                trend = 1
+        line[i] = fl if trend == 1 else fu
+        direction[i] = trend
+    return line, direction
+
+
+def adx(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
+        period: int = 14) -> tuple[Series, Series, Series]:
+    """Wilder's ADX, +DI and -DI."""
+    n = len(closes)
+    adx_s: Series = [None] * n
+    pdi_s: Series = [None] * n
+    mdi_s: Series = [None] * n
+    if n < 2 * period + 1:
+        return adx_s, pdi_s, mdi_s
+    tr, pdm, mdm = [0.0], [0.0], [0.0]
+    for i in range(1, n):
+        up, dn = highs[i] - highs[i - 1], lows[i - 1] - lows[i]
+        pdm.append(up if up > dn and up > 0 else 0.0)
+        mdm.append(dn if dn > up and dn > 0 else 0.0)
+        tr.append(max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]),
+                      abs(lows[i] - closes[i - 1])))
+    s_tr, s_p, s_m = sum(tr[1:period + 1]), sum(pdm[1:period + 1]), sum(mdm[1:period + 1])
+    dxs: list[tuple[int, float]] = []
+    for i in range(period, n):
+        if i > period:
+            s_tr += tr[i] - s_tr / period
+            s_p += pdm[i] - s_p / period
+            s_m += mdm[i] - s_m / period
+        pdi = 100 * s_p / s_tr if s_tr else 0.0
+        mdi = 100 * s_m / s_tr if s_tr else 0.0
+        pdi_s[i], mdi_s[i] = pdi, mdi
+        dxs.append((i, 100 * abs(pdi - mdi) / (pdi + mdi) if pdi + mdi else 0.0))
+    first = dxs[:period]
+    val = sum(d for _, d in first) / period
+    adx_s[first[-1][0]] = val
+    for i, d in dxs[period:]:
+        val = (val * (period - 1) + d) / period
+        adx_s[i] = val
+    return adx_s, pdi_s, mdi_s
+
+
+def cci(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
+        period: int = 20) -> Series:
+    tp = [(h + lo + c) / 3 for h, lo, c in zip(highs, lows, closes, strict=True)]
+    out: Series = [None] * len(tp)
+    for i in range(period - 1, len(tp)):
+        w = tp[i - period + 1:i + 1]
+        m = sum(w) / period
+        md = sum(abs(x - m) for x in w) / period
+        out[i] = (tp[i] - m) / (0.015 * md) if md else 0.0
+    return out
+
+
+def stochastic(highs: Sequence[float], lows: Sequence[float], closes: Sequence[float],
+               k_period: int = 14, k_smooth: int = 3, d_period: int = 3) -> tuple[Series, Series]:
+    raw: Series = [None] * len(closes)
+    for i in range(k_period - 1, len(closes)):
+        hh = max(highs[i - k_period + 1:i + 1])
+        ll = min(lows[i - k_period + 1:i + 1])
+        raw[i] = 100 * (closes[i] - ll) / (hh - ll) if hh > ll else 50.0
+    k = sma_opt(raw, k_smooth)
+    return k, sma_opt(k, d_period)
+
+
+def relative_volume(volumes: Sequence[float], period: int = 20) -> Series:
+    """Volume divided by the mean of the PREVIOUS `period` bars."""
+    out: Series = [None] * len(volumes)
+    for i in range(period, len(volumes)):
+        base = sum(volumes[i - period:i]) / period
+        out[i] = volumes[i] / base if base > 0 else None
+    return out
+
+
+def classic_pivots(high: float, low: float, close: float) -> dict[str, float]:
+    """Floor-trader pivots from the previous completed session."""
+    p = (high + low + close) / 3
+    return {"P": p, "R1": 2 * p - low, "S1": 2 * p - high, "R2": p + (high - low),
+            "S2": p - (high - low), "R3": high + 2 * (p - low), "S3": low - 2 * (high - p)}
+
+
+FIB_RATIOS = (0.236, 0.382, 0.5, 0.618, 0.786)
+
+
+def fibonacci(swing_high: float, swing_low: float, up_move: bool) -> dict[str, float]:
+    """Retracement levels of the move from swing_low to swing_high (or reverse)."""
+    rng = swing_high - swing_low
+    if up_move:
+        return {f"{r:.3f}": swing_high - r * rng for r in FIB_RATIOS}
+    return {f"{r:.3f}": swing_low + r * rng for r in FIB_RATIOS}
+
+
+def candle_anatomy(o: float, h: float, lo: float, c: float) -> dict[str, float | str]:
+    rng = h - lo
+    body = abs(c - o)
+    return {
+        "direction": "BULLISH" if c > o else "BEARISH" if c < o else "NEUTRAL",
+        "range": rng,
+        "body": body,
+        "upper_wick": h - max(o, c),
+        "lower_wick": min(o, c) - lo,
+        "body_pct": body / rng if rng else 0.0,
+    }

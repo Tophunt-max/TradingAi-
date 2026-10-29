@@ -15,7 +15,7 @@ select = ["E", "F", "I", "B", "UP", "S", "SIM"]
 ignore = ["B008", "S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"backend/tests/**" = ["S105", "S106"]
+"backend/tests/**" = ["S105", "S106", "S311"]
 "backend/app/strategies/catalog.py" = ["E501"]
 "backend/tests/fake_indstocks.py" = ["E501"]
 

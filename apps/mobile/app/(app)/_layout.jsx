@@ -24,6 +24,7 @@ const TITLES = {
   brokers: 'Broker Connections',
   screener: 'Market Screener',
   education: 'Learn & Grow',
+  models: 'AI Model Lab',
 };
 
 export default function AppLayout() {

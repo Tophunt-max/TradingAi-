@@ -17,10 +17,13 @@ from app.models.bots import (
     TradingMode,
 )
 from app.models.instruments import Instrument, InstrumentSync
+from app.models.ml import ModelVersion, Prediction
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
     "AuditLog",
+    "ModelVersion",
+    "Prediction",
     "Instrument",
     "InstrumentSync",
     "Bot",

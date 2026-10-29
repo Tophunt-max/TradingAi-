@@ -18,7 +18,7 @@ function linePath(values, x, y) {
  * Candlestick chart with optional overlay lines.
  * overlays: [{ key, values, color }]
  */
-export function CandleChart({ candles, overlays = [], height = 260, testID }) {
+export function CandleChart({ candles, overlays = [], markers = [], zones = [], height = 260, testID }) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const c = theme.chart;
@@ -57,6 +57,17 @@ export function CandleChart({ candles, overlays = [], height = 260, testID }) {
               </SvgText>
             </G>
           ))}
+          {zones.map((z, i) => (
+            <Rect
+              key={`z${i}`}
+              x={x(z.start) - step / 2}
+              y={y(z.top)}
+              width={Math.max((z.end - z.start + 1) * step, step)}
+              height={Math.max(y(z.bottom) - y(z.top), 1)}
+              fill={z.direction === 'BULLISH' ? c.candleUp : c.candleDown}
+              opacity={0.13}
+            />
+          ))}
           {candles.map((k, i) => {
             const up = k.close >= k.open;
             const color = up ? c.candleUp : c.candleDown;
@@ -72,6 +83,15 @@ export function CandleChart({ candles, overlays = [], height = 260, testID }) {
           {overlays.map((o) => (
             <Path key={o.key} d={linePath(o.values, x, y)} stroke={o.color} strokeWidth={1.5} fill="none" />
           ))}
+          {markers.map((m, i) => {
+            const k = candles[m.index];
+            if (!k) return null;
+            const bull = m.direction === 'BULLISH';
+            const px = x(m.index);
+            const py = bull ? Math.min(y(k.low) + 10, height - 2) : Math.max(y(k.high) - 10, 2);
+            const d = bull ? `M${px},${py - 5} L${px - 4},${py + 2} L${px + 4},${py + 2} Z` : `M${px},${py + 5} L${px - 4},${py - 2} L${px + 4},${py - 2} Z`;
+            return <Path key={`m${i}`} d={d} fill={bull ? c.candleUp : c.candleDown} />;
+          })}
           {last ? (
             <G>
               <Line x1={0} x2={plotW} y1={y(last.close)} y2={y(last.close)} stroke={theme.colors.primary} strokeDasharray="4,4" strokeWidth={1} />

@@ -43,10 +43,15 @@ served at `http://localhost:8000/docs` in development and test only.
 | GET | `/market/quotes?segment=&symbols=` | ✓ | DEMO quotes (indices + stocks) |
 | GET | `/market/movers` | ✓ | DEMO gainers, losers, relative-volume leaders |
 | GET | `/market/search?q=` | ✓ | Supported instruments |
-| GET | `/charts/{symbol}/candles?timeframe=&limit=&indicators=` | ✓ | Closed candles only. Indicators: `ema9,ema21,ema50,ema200,rsi14,macd,bb20,atr14` |
+| GET | `/charts/{symbol}/candles?timeframe=&limit=&indicators=` | ✓ | Closed candles only. Indicators: `ema9,ema21,ema50,ema200,rsi14,macd,bb20,atr14,vwap,supertrend,adx14,cci20,stoch,rvol20`; `annotations=true` adds confirmed patterns and SMC zones |
 | GET | `/options/{NIFTY\|BANKNIFTY}/expiries` | ✓ | DEMO dates, not the exchange calendar |
 | GET | `/options/{underlying}/chain?expiry=&strikes=` | ✓ | DEMO chain, Black-Scholes Greeks. `lot_size`/`tick_size` are `null` |
-| GET | `/analysis/{symbol}?timeframe=` | ✓ | Rule-based trend + confirmed levels. `probabilities: null`, `decision: NO_TRADE` |
+| GET | `/analysis/{symbol}?timeframe=` | ✓ | 12-step pipeline: regime, indicators, patterns, SMC, strategies, prediction (promoted model only), setup candidate, contract shortlist, explanation. Always `NO_TRADE` |
+| GET | `/analysis/{symbol}/mtf` | ✓ | Trend/regime/RSI on 5m, 15m, 1h, 1d |
+| GET | `/models`, `/models/{id}` | ✓ | Model registry with walk-forward metrics and gate |
+| GET | `/models/predictions?symbol=` | ✓ | Served predictions (outcomes resolved in Phase 7) |
+| POST | `/admin/models/train` | admin | Train a candidate `{symbol, timeframe, horizon_bars?}` |
+| POST | `/admin/models/{id}/promote` \| `/retire` | admin | Promote (gate must pass, non-DEMO) or retire |
 | GET | `/bots/strategies` | ✓ | Strategy catalogue / templates |
 | POST | `/bots/ai-draft` | ✓ | Rule-based draft bounded by global risk limits |
 | GET/POST | `/bots` | ✓ | List (filter `status`) / create a PAPER draft |

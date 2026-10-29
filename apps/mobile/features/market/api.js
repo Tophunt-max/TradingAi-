@@ -28,10 +28,10 @@ export function useSearch(q) {
   });
 }
 
-export function useCandles(symbol, timeframe, indicators, limit = 90) {
+export function useCandles(symbol, timeframe, indicators, limit = 90, annotations = false) {
   return useQuery({
-    queryKey: ['candles', symbol, timeframe, indicators, limit],
-    queryFn: () => api.get(`/api/v1/charts/${symbol}/candles?${qs({ timeframe, indicators, limit })}`),
+    queryKey: ['candles', symbol, timeframe, indicators, limit, annotations],
+    queryFn: () => api.get(`/api/v1/charts/${symbol}/candles?${qs({ timeframe, indicators, limit, annotations: annotations ? 'true' : undefined })}`),
     refetchInterval: 30_000,
     placeholderData: (prev) => (prev?.symbol === symbol ? prev : undefined),
   });
@@ -55,4 +55,16 @@ export function useAnalysis(symbol, timeframe) {
     queryFn: () => api.get(`/api/v1/analysis/${symbol}?${qs({ timeframe })}`),
     refetchInterval: 60_000,
   });
+}
+
+export function useMtf(symbol) {
+  return useQuery({ queryKey: ['mtf', symbol], queryFn: () => api.get(`/api/v1/analysis/${symbol}/mtf`), refetchInterval: 120_000 });
+}
+
+export function useModels() {
+  return useQuery({ queryKey: ['models'], queryFn: () => api.get('/api/v1/models') });
+}
+
+export function usePredictionHistory(symbol) {
+  return useQuery({ queryKey: ['predictions', symbol], queryFn: () => api.get(`/api/v1/models/predictions?${qs({ symbol, limit: 50 })}`) });
 }

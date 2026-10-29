@@ -39,6 +39,44 @@ export const LESSONS = [
     body: ['The difference between the 12 and 26 period EMAs, with a 9-period signal line. The histogram shows the gap between them. It is derived from the same prices as EMAs, so it is not an independent confirmation.'],
   },
   {
+    id: 'vwap', section: 'Indicators', title: 'VWAP', minutes: 2,
+    body: ['Volume-weighted average price for the session, reset every day at the open. Price above VWAP means buyers have paid more than the average so far. Index charts here use futures volume as a proxy.'],
+  },
+  {
+    id: 'supertrend', section: 'Indicators', title: 'Supertrend and ADX', minutes: 3,
+    body: [
+      'Supertrend (10, 3) is a trailing line set 3 × ATR away from price; it flips when price closes through it.',
+      'ADX (14) measures trend strength, not direction. Above 25 is usually called trending; +DI and −DI show which side is stronger.',
+    ],
+  },
+  {
+    id: 'oscillators', section: 'Indicators', title: 'Stochastic and CCI', minutes: 2,
+    body: ['Stochastic %K shows where the close sits inside the recent high–low range (0–100). CCI measures distance from the average typical price. Both are momentum oscillators and are correlated with RSI.'],
+  },
+  {
+    id: 'patterns', section: 'Indicators', title: 'Candlestick and chart patterns', minutes: 4,
+    body: [
+      'Candlestick patterns (doji, hammer, engulfing, stars) describe one to three candles. Chart patterns (double tops, head and shoulders, flags, breakout and retest) use confirmed swing points.',
+      'QuantAI only reports a pattern after every candle it needs has closed. A swing point needs 3 later candles, so patterns are never redrawn after the fact.',
+    ],
+  },
+  {
+    id: 'smc', section: 'Indicators', title: 'Smart Money Concepts', minutes: 5,
+    body: [
+      'BOS (break of structure): a close beyond the last confirmed swing in the trend direction. CHOCH (change of character): the first break against the prior trend.',
+      'Order block: the last opposite-colour candle before the move that broke structure. Fair value gap: a three-candle gap left by a fast move.',
+      'Liquidity sweep: a wick through a swing that closes back inside. Equal highs/lows: swings at nearly the same price, where stops tend to rest.',
+    ],
+  },
+  {
+    id: 'probabilities', section: 'Methodology', title: 'How AI probabilities are earned', minutes: 4,
+    body: [
+      'The baseline model predicts UP, SIDEWAYS or DOWN over a fixed number of bars, measured against ATR.',
+      'It is tested walk-forward: trained only on the past, with a gap so no training label overlaps the test period. It must beat a simple base-rate forecast on log loss and Brier score, and be calibrated (when it says 60%, it should be right about 60% of the time).',
+      'Only then can an admin promote it, and only if it was trained on real data. A probability is about the underlying, not about an option trade.',
+    ],
+  },
+  {
     id: 'backtests', section: 'Methodology', title: 'How to read a backtest', minutes: 4,
     body: [
       'A credible backtest uses only information available at each moment (no lookahead), includes realistic costs, spreads and slippage, and is tested out-of-sample.',

@@ -38,7 +38,8 @@ function InsightCard() {
           <AppText variant="heading">Market Insight</AppText>
           {a.data ? (
             <AppText variant="caption" tone="muted">
-              NIFTY 15m trend: <AppText variant="caption" tone={TREND_TONE[a.data.trend]}>{a.data.trend}</AppText> (rule-based) · Decision: NO TRADE
+              NIFTY 15m: <AppText variant="caption" tone={TREND_TONE[a.data.trend]}>{a.data.trend}</AppText>
+              {a.data.regime ? ` · ${a.data.regime.label.replace('_', ' ').toLowerCase()} regime` : ''} · Decision: NO TRADE
             </AppText>
           ) : (
             <AppText variant="caption" tone="muted">{a.isError ? a.error.message : 'Loading…'}</AppText>
@@ -46,7 +47,11 @@ function InsightCard() {
         </View>
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-        <Badge label="NO AI MODEL YET" tone="warning" />
+        {a.data?.probabilities ? (
+          <Badge label={`UP ${Math.round(a.data.probabilities.UP * 100)}% · DOWN ${Math.round(a.data.probabilities.DOWN * 100)}%`} tone="info" />
+        ) : (
+          <Badge label="NO PROMOTED MODEL" tone="warning" />
+        )}
         <Button title="View analysis" size="sm" variant="ghost" icon="arrow-forward" onPress={() => router.push('/ai-lab')} />
       </View>
     </Card>

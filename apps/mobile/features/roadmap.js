@@ -10,12 +10,12 @@ export const FEATURES = {
   brokers: { title: 'Broker Connections', icon: 'link-outline', phase: 8, route: '/brokers', summary: 'Paper adapter and planned broker integrations.' },
   education: { title: 'Learn & Grow', icon: 'school-outline', phase: 4, route: '/education', summary: 'Strategies, indicators, risk and glossary.' },
   backtesting: { title: 'Backtesting Lab', icon: 'time-outline', phase: 7, summary: 'Event-driven backtests, walk-forward tests and Monte Carlo analysis without lookahead.' },
-  'model-lab': { title: 'AI Model & Learning', icon: 'git-network-outline', phase: 7, summary: 'Model registry, calibration, drift monitoring, shadow testing and rollback.' },
+  'model-lab': { title: 'AI Model Lab', icon: 'git-network-outline', phase: 4, route: '/models', summary: 'Model registry, walk-forward metrics, promotion gate and prediction history.' },
   reports: { title: 'Reports', icon: 'document-text-outline', phase: 7, summary: 'Daily and weekly performance, charges, slippage and CSV export.' },
   'ai-analysis': { title: 'AI Market Analysis', icon: 'sparkles-outline', phase: 4, route: '/ai-lab', summary: 'Probabilities with calibration, uncertainty and NO TRADE.' },
   'bot-builder': { title: 'Bot Builder', icon: 'construct-outline', phase: 5, route: '/bots', summary: 'AI Auto Create, manual builder and templates.' },
   portfolio: { title: 'Portfolio & P&L', icon: 'pie-chart-outline', phase: 6, route: '/portfolio', summary: 'Paper P&L and charges. Paper and live P&L are never mixed.' },
-  charts: { title: 'Charts & Technicals', icon: 'bar-chart-outline', phase: 4, route: '/instrument/NIFTY', summary: 'Candlesticks and indicators.' },
+  charts: { title: 'Charts & Technicals', icon: 'bar-chart-outline', phase: 4, route: '/instrument/NIFTY', summary: 'Candlesticks, indicators, patterns and SMC zones.' },
 };
 
 export const MORE_SECTIONS = [

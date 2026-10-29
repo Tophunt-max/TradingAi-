@@ -1112,6 +1112,16 @@
               "default": "ema9,ema21",
               "title": "Indicators"
             }
+          },
+          {
+            "name": "annotations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Annotations"
+            }
           }
         ],
         "responses": {
@@ -1316,6 +1326,54 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AnalysisPayload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/{symbol}/mtf": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Multi Timeframe",
+        "operationId": "multi_timeframe_api_v1_analysis__symbol__mtf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 32,
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiTimeframePayload"
                 }
               }
             }
@@ -2364,6 +2422,326 @@
           }
         ]
       }
+    },
+    "/api/v1/models": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List Models",
+        "operationId": "list_models_api_v1_models_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelOut"
+                  },
+                  "title": "Response List Models Api V1 Models Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models/predictions": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Predictions",
+        "operationId": "predictions_api_v1_models_predictions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictionOut"
+                  },
+                  "title": "Response Predictions Api V1 Models Predictions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models/{model_id}": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Get Model",
+        "operationId": "get_model_api_v1_models__model_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/models/train": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Train",
+        "operationId": "train_api_v1_admin_models_train_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/models/{model_id}/promote": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Promote",
+        "operationId": "promote_api_v1_admin_models__model_id__promote_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/models/{model_id}/retire": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Retire",
+        "operationId": "retire_api_v1_admin_models__model_id__retire_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2654,6 +3032,66 @@
             ],
             "title": "Rsi"
           },
+          "regime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Regime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "indicators": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Indicators"
+          },
+          "structure": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structure"
+          },
+          "patterns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Patterns"
+          },
+          "smc": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Smc"
+          },
+          "strategies": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Strategies"
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prediction"
+          },
           "probabilities": {
             "anyOf": [
               {
@@ -2679,6 +3117,37 @@
             ],
             "title": "Model Version"
           },
+          "setup_candidate": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Candidate"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
+          "pipeline": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStep"
+            },
+            "type": "array",
+            "title": "Pipeline"
+          },
           "decision": {
             "type": "string",
             "enum": [
@@ -2693,6 +3162,13 @@
             },
             "type": "array",
             "title": "Abstain Reasons"
+          },
+          "explanation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Explanation"
           }
         },
         "type": "object",
@@ -2715,10 +3191,21 @@
           "resistance",
           "atr",
           "rsi",
+          "regime",
+          "indicators",
+          "structure",
+          "patterns",
+          "smc",
+          "strategies",
+          "prediction",
           "probabilities",
           "model_version",
+          "setup_candidate",
+          "options",
+          "pipeline",
           "decision",
-          "abstain_reasons"
+          "abstain_reasons",
+          "explanation"
         ],
         "title": "AnalysisPayload"
       },
@@ -3450,6 +3937,24 @@
             },
             "type": "object",
             "title": "Indicators"
+          },
+          "annotations": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotations"
           },
           "note": {
             "type": "string",
@@ -4415,6 +4920,126 @@
         ],
         "title": "Message"
       },
+      "ModelOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "horizon_bars": {
+            "type": "integer",
+            "title": "Horizon Bars"
+          },
+          "algorithm": {
+            "type": "string",
+            "title": "Algorithm"
+          },
+          "feature_version": {
+            "type": "string",
+            "title": "Feature Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
+          "data_provider": {
+            "type": "string",
+            "title": "Data Provider"
+          },
+          "train_rows": {
+            "type": "integer",
+            "title": "Train Rows"
+          },
+          "data_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data From"
+          },
+          "data_to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data To"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "promoted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promoted At"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics"
+          },
+          "gate": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Gate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "symbol",
+          "timeframe",
+          "horizon_bars",
+          "algorithm",
+          "feature_version",
+          "status",
+          "data_source",
+          "data_provider",
+          "train_rows",
+          "data_from",
+          "data_to",
+          "created_at",
+          "promoted_at",
+          "retired_at",
+          "metrics",
+          "gate"
+        ],
+        "title": "ModelOut"
+      },
       "MoversPayload": {
         "properties": {
           "source": {
@@ -4501,6 +5126,42 @@
           "volume_leaders"
         ],
         "title": "MoversPayload"
+      },
+      "MultiTimeframePayload": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/TimeframeView"
+            },
+            "type": "array",
+            "title": "Views"
+          },
+          "alignment": {
+            "type": "string",
+            "title": "Alignment"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "source",
+          "views",
+          "alignment",
+          "note"
+        ],
+        "title": "MultiTimeframePayload"
       },
       "NotificationSpec": {
         "properties": {
@@ -4902,6 +5563,40 @@
         ],
         "title": "Page[PositionOut]"
       },
+      "PipelineStep": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DONE",
+              "SKIPPED",
+              "FAILED",
+              "BLOCKED"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "status",
+          "detail"
+        ],
+        "title": "PipelineStep"
+      },
       "PortfolioSummary": {
         "properties": {
           "mode": {
@@ -5067,6 +5762,102 @@
           "opened_at"
         ],
         "title": "PositionOut"
+      },
+      "PredictionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "model_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Model Version Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "horizon_bars": {
+            "type": "integer",
+            "title": "Horizon Bars"
+          },
+          "bar_ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bar Ts"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "p_down": {
+            "type": "number",
+            "title": "P Down"
+          },
+          "p_sideways": {
+            "type": "number",
+            "title": "P Sideways"
+          },
+          "p_up": {
+            "type": "number",
+            "title": "P Up"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "model_version_id",
+          "symbol",
+          "timeframe",
+          "horizon_bars",
+          "bar_ts",
+          "close",
+          "p_down",
+          "p_sideways",
+          "p_up",
+          "regime",
+          "data_source",
+          "outcome",
+          "created_at"
+        ],
+        "title": "PredictionOut"
       },
       "PreferencesOut": {
         "properties": {
@@ -5551,6 +6342,62 @@
           "refresh_token"
         ],
         "title": "RefreshRequest"
+      },
+      "Regime": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "adx": {
+            "type": "number",
+            "title": "Adx"
+          },
+          "atr_pct": {
+            "type": "number",
+            "title": "Atr Pct"
+          },
+          "atr_percentile": {
+            "type": "number",
+            "title": "Atr Percentile"
+          },
+          "bb_width_percentile": {
+            "type": "number",
+            "title": "Bb Width Percentile"
+          },
+          "ema50_slope_pct": {
+            "type": "number",
+            "title": "Ema50 Slope Pct"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "family",
+          "adx",
+          "atr_pct",
+          "atr_percentile",
+          "bb_width_percentile",
+          "ema50_slope_pct",
+          "reasons",
+          "method"
+        ],
+        "title": "Regime"
       },
       "RegisterRequest": {
         "properties": {
@@ -6381,6 +7228,112 @@
         ],
         "title": "SystemStatus"
       },
+      "TimeframeView": {
+        "properties": {
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "rsi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsi"
+          },
+          "supertrend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supertrend"
+          },
+          "adx": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adx"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timeframe",
+          "available"
+        ],
+        "title": "TimeframeView"
+      },
       "TokenPair": {
         "properties": {
           "access_token": {
@@ -6422,6 +7375,45 @@
           "LIVE"
         ],
         "title": "TradingMode"
+      },
+      "TrainRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "enum": [
+              "5m",
+              "15m",
+              "1h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "default": "15m"
+          },
+          "horizon_bars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Bars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "TrainRequest"
       },
       "UserOut": {
         "properties": {

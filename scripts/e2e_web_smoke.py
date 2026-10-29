@@ -143,6 +143,7 @@ def main() -> int:
             shot("04-markets")
             page.get_by_test_id("quote-NIFTY").click()
             expect(page.get_by_test_id("candle-chart")).to_be_visible(timeout=10_000)
+            expect(page.get_by_test_id("toggle-smc")).to_be_visible()
             if args.live_fake:
                 expect(page.get_by_test_id("chart-proxy-note")).to_contain_text("futures")
             shot("05-chart")
@@ -152,7 +153,16 @@ def main() -> int:
             page.get_by_role("tab", name="AI Lab").click()
             expect(page.get_by_test_id("analysis-decision")).to_contain_text("NO TRADE",
                                                                               timeout=10_000)
+            expect(page.get_by_test_id("regime-card")).to_be_visible()
+            expect(page.get_by_test_id("probability-card")).to_contain_text("NOT AVAILABLE")
+            expect(page.get_by_test_id("mtf-strip")).to_be_visible(timeout=10_000)
             shot("06-ai-analysis")
+            page.get_by_test_id("strategies-card").get_by_role("button").first.click()
+            expect(page.get_by_test_id("strategies-card")).to_contain_text("Momentum")
+            page.get_by_role("button", name="AI Model Lab").click()
+            expect(page.get_by_text("No models trained yet")).to_be_visible(timeout=10_000)
+            shot("06b-model-lab")
+            page.go_back()
 
             # AI Auto Create -> saved draft -> validation blocks activation.
             page.get_by_role("tab", name="Bots").click()

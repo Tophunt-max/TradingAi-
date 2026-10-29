@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { AppText, Badge, Button, Card, CardHeader, ChipRow, DataSourceBadge, KeyValue, ListRow, NoticeBanner, QueryState, Screen, Select } from '../../../components/ui';
-import { useTheme } from '../../../components/theme/ThemeProvider';
-import { useAnalysis } from '../../../features/market/api';
+import { AppText, Button, Card, CardHeader, ChipRow, DataSourceBadge, ListRow, NoticeBanner, QueryState, Screen, Select } from '../../../components/ui';
+import { ProbabilityCard } from '../../../features/ai/ProbabilityCard';
+import { LevelsCard, MtfStrip, PatternsCard, PipelineCard, RegimeCard, SetupCard, SmcCard, StrategiesCard } from '../../../features/ai/Sections';
+import { useAnalysis, useMtf } from '../../../features/market/api';
+import { QualityBanner } from '../../../features/market/QualityBanner';
 import { FEATURES, featureHref } from '../../../features/roadmap';
 import { formatIST } from '../../../services/format';
-import { QualityBanner } from '../../../features/market/QualityBanner';
 
 const STOCKS = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'ITC', 'LT', 'BHARTIARTL', 'TATAMOTORS'];
-const TONE = { BULLISH: 'positive', BEARISH: 'negative', SIDEWAYS: 'warning', NEUTRAL: 'muted' };
-const ICON = { BULLISH: 'trending-up', BEARISH: 'trending-down', SIDEWAYS: 'swap-horizontal' };
 
 export default function AiLab() {
-  const theme = useTheme();
   const params = useLocalSearchParams();
   const [group, setGroup] = useState('NIFTY');
   const [stock, setStock] = useState('RELIANCE');
@@ -34,59 +31,32 @@ export default function AiLab() {
 
   const symbol = group === 'STOCKS' ? stock : group;
   const a = useAnalysis(symbol, tf);
+  const mtf = useMtf(symbol);
 
   return (
-    <Screen title="AI Market Analysis" subtitle="Transparent, rule-based until a calibrated model ships">
+    <Screen title="AI Market Analysis" subtitle="Regime, structure, strategies and calibrated probabilities" refreshing={a.isRefetching} onRefresh={a.refetch}>
       <ChipRow value={group} onChange={setGroup} options={[{ value: 'NIFTY', label: 'NIFTY' }, { value: 'BANKNIFTY', label: 'BANKNIFTY' }, { value: 'STOCKS', label: 'STOCKS' }]} testIDPrefix="ai-group" />
       {group === 'STOCKS' ? <Select label="Stock" value={stock} onChange={setStock} options={STOCKS.map((s) => ({ value: s, label: s }))} /> : null}
-      <ChipRow value={tf} onChange={setTf} options={['5m', '15m', '1h', '1d'].map((v) => ({ value: v, label: v.toUpperCase() }))} />
+      <ChipRow value={tf} onChange={setTf} options={['5m', '15m', '1h', '1d'].map((v) => ({ value: v, label: v.toUpperCase() }))} testIDPrefix="ai-tf" />
       <QueryState query={a}>
         {(d) => (
           <>
-            <Card testID="analysis-trend" style={{ borderColor: theme.colors[TONE[d.trend]] ?? theme.colors.border }}>
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <View style={{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surfaceRaised }}>
-                  <Ionicons name={ICON[d.trend]} size={28} color={theme.colors[TONE[d.trend]]} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppText variant="caption" tone="muted">Technical trend · {symbol} · {tf}</AppText>
-                  <AppText variant="title" tone={TONE[d.trend]}>{d.trend}</AppText>
-                  <AppText variant="caption" tone="faint">{d.trend_method}</AppText>
-                </View>
-                <DataSourceBadge source={d.source} />
-              </View>
-            </Card>
-            <QualityBanner payload={d} />
-
-            <Card>
-              <CardHeader title="AI probability" right={<Badge label="NOT AVAILABLE" tone="warning" />} />
-              <AppText tone="muted">
-                UP / DOWN / SIDEWAYS probabilities appear only after a model passes out-of-sample calibration checks (Phase 4). A high probability
-                alone will never authorise a trade.
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <AppText variant="caption" tone="faint">
+                {symbol} · {tf} · {d.provider} · {formatIST(d.as_of)} IST
               </AppText>
-            </Card>
-
-            <Card>
-              <CardHeader title="Key levels" subtitle="Confirmed swing points only" />
-              <KeyValue label="Last price" value={d.last_price.toLocaleString('en-IN')} />
-              {d.resistance.map((r, i) => <KeyValue key={`r${r}`} label={`Resistance ${i + 1}`} value={r.toLocaleString('en-IN')} tone="negative" />)}
-              {d.support.map((s, i) => <KeyValue key={`s${s}`} label={`Support ${i + 1}`} value={s.toLocaleString('en-IN')} tone="positive" />)}
-              {!d.resistance.length && !d.support.length ? <AppText tone="muted">No confirmed levels in range.</AppText> : null}
-              <KeyValue label="ATR (14)" value={d.atr ?? '—'} />
-            </Card>
-
-            <Card>
-              <CardHeader title="Signals" subtitle="Correlated; not independent confirmations" />
-              {d.signals.map((s) => (
-                <ListRow key={s.name} title={s.name} subtitle={s.reading} right={<Badge label={s.bias} tone={TONE[s.bias] === 'muted' ? 'neutral' : TONE[s.bias]} />} />
-              ))}
-            </Card>
-
-            <Card testID="analysis-decision" style={{ borderColor: theme.colors.warning }}>
-              <CardHeader title="Decision" right={<Badge label="NO TRADE" tone="warning" />} />
-              {d.abstain_reasons.map((r) => <AppText key={r} variant="caption" tone="muted">• {r}</AppText>)}
-              <AppText variant="caption" tone="faint" style={{ marginTop: 8 }}>Generated {formatIST(d.as_of)} IST</AppText>
-            </Card>
+              <DataSourceBadge source={d.source} stale={d.quality?.status === 'FAIL'} />
+            </View>
+            <QualityBanner payload={d} />
+            <PipelineCard steps={d.pipeline} reasons={d.abstain_reasons} explanation={d.explanation} />
+            <ProbabilityCard prediction={d.prediction} />
+            <RegimeCard regime={d.regime} trend={d.trend} />
+            <MtfStrip data={mtf.data} />
+            <SetupCard setup={d.setup_candidate} options={d.options} />
+            <StrategiesCard strategies={d.strategies} />
+            <PatternsCard patterns={d.patterns} structure={d.structure} />
+            <SmcCard smc={d.smc} />
+            <LevelsCard data={d} />
           </>
         )}
       </QueryState>
@@ -94,7 +64,7 @@ export default function AiLab() {
       <Card>
         <CardHeader title="Research tools" />
         {['model-lab', 'backtesting'].map((id) => (
-          <ListRow key={id} title={FEATURES[id].title} subtitle={`Phase ${FEATURES[id].phase} · not built yet`} icon={FEATURES[id].icon} onPress={() => router.push(featureHref(id))} />
+          <ListRow key={id} title={FEATURES[id].title} subtitle={FEATURES[id].route ? FEATURES[id].summary : `Phase ${FEATURES[id].phase} · not built yet`} icon={FEATURES[id].icon} onPress={() => router.push(featureHref(id))} />
         ))}
       </Card>
       {a.data?.is_demo ? <NoticeBanner tone="info">Analysis uses synthetic DEMO candles until an authorised data provider is connected.</NoticeBanner> : null}

@@ -22,3 +22,11 @@ jest.mock('@expo/vector-icons', () => {
   const Icon = ({ name }) => require('react').createElement(Text, { accessibilityElementsHidden: true }, name);
   return { Ionicons: Icon };
 });
+
+// Navigation is not under test in component tests.
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
+  useLocalSearchParams: () => ({}),
+  Link: ({ children }) => children,
+  Stack: { Screen: () => null },
+}));

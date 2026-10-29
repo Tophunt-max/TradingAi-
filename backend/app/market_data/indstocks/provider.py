@@ -37,7 +37,7 @@ INTERVALS = {  # our timeframe -> (INDstocks interval, minutes, max days per cal
     "1d": ("1day", 1440, 365),
 }
 INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"}
-MAX_PAGES = 4
+MAX_PAGES = 60  # enough for ~1 year of intraday history when training
 
 _cache = TTLCache()
 

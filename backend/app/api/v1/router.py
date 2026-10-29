@@ -9,6 +9,7 @@ from app.api.v1 import (
     charts,
     health,
     market,
+    models,
     options,
     portfolio,
     risk,
@@ -18,5 +19,5 @@ from app.api.v1 import (
 
 api_router = APIRouter(prefix="/api/v1")
 for module in (health, system, auth, users, admin, market, charts, options, analysis, bots,
-               risk, portfolio, alerts):
+               risk, portfolio, alerts, models):
     api_router.include_router(module.router)
