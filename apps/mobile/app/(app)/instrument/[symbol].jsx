@@ -6,7 +6,8 @@ import { CandleChart, IndicatorPanel } from '../../../components/charts/CandleCh
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { useCandles, useQuotes } from '../../../features/market/api';
 import { isStale } from '../../../features/system/api';
-import { formatIST } from '../../../services/format';
+import { formatIST, formatPrice } from '../../../services/format';
+import { QualityBanner } from '../../../features/market/QualityBanner';
 
 const TIMEFRAMES = ['1m', '3m', '5m', '15m', '1h', '1d'].map((v) => ({ value: v, label: v.toUpperCase() }));
 
@@ -30,7 +31,7 @@ export default function Instrument() {
         <View>
           {q ? (
             <>
-              <AppText variant="display" style={{ fontVariant: ['tabular-nums'] }}>{Number(q.last).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</AppText>
+              <AppText variant="display" style={{ fontVariant: ['tabular-nums'] }}>{formatPrice(q.last)}</AppText>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 <PnLText value={q.change} />
                 <PnLText value={q.change_pct} prefix="(" suffix="%)" />
@@ -58,8 +59,12 @@ export default function Instrument() {
                   </>
                 ) : null}
                 {overlay.bb ? <AppText variant="caption" style={{ color: s[2] }}>BB 20, 2</AppText> : null}
-                <AppText variant="caption" tone="faint">Closed candles · {formatIST(d.as_of)} IST</AppText>
+                <AppText variant="caption" tone="faint">{d.provider} · closed candles · {formatIST(d.as_of)} IST</AppText>
               </View>
+              {d.notes?.filter((n) => n.includes('proxy')).map((n) => (
+                <NoticeBanner key={n} tone="info" testID="chart-proxy-note">{n}</NoticeBanner>
+              ))}
+              <QualityBanner payload={d} testID="chart-quality" />
               <CandleChart
                 testID="candle-chart"
                 candles={d.candles}

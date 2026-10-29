@@ -7,6 +7,7 @@ import { useTheme } from '../../../components/theme/ThemeProvider';
 import { useAnalysis } from '../../../features/market/api';
 import { FEATURES, featureHref } from '../../../features/roadmap';
 import { formatIST } from '../../../services/format';
+import { QualityBanner } from '../../../features/market/QualityBanner';
 
 const STOCKS = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'ITC', 'LT', 'BHARTIARTL', 'TATAMOTORS'];
 const TONE = { BULLISH: 'positive', BEARISH: 'negative', SIDEWAYS: 'warning', NEUTRAL: 'muted' };
@@ -55,6 +56,7 @@ export default function AiLab() {
                 <DataSourceBadge source={d.source} />
               </View>
             </Card>
+            <QualityBanner payload={d} />
 
             <Card>
               <CardHeader title="AI probability" right={<Badge label="NOT AVAILABLE" tone="warning" />} />
@@ -95,7 +97,7 @@ export default function AiLab() {
           <ListRow key={id} title={FEATURES[id].title} subtitle={`Phase ${FEATURES[id].phase} · not built yet`} icon={FEATURES[id].icon} onPress={() => router.push(featureHref(id))} />
         ))}
       </Card>
-      <NoticeBanner tone="info">Analysis uses synthetic DEMO candles until an authorised data provider is connected.</NoticeBanner>
+      {a.data?.is_demo ? <NoticeBanner tone="info">Analysis uses synthetic DEMO candles until an authorised data provider is connected.</NoticeBanner> : null}
     </Screen>
   );
 }

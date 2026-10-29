@@ -55,30 +55,35 @@ def main() -> int:
     ap.add_argument("--dist", required=True)
     ap.add_argument("--screenshots")
     ap.add_argument("--web-port", type=int, default=8081)
+    ap.add_argument("--live-fake", action="store_true",
+                    help="Run the API in INDSTOCKS mode against the in-memory INDstocks fake")
     args = ap.parse_args()
     web_url = f"http://localhost:{args.web_port}"
     shots = Path(args.screenshots) if args.screenshots else None
     if shots:
         shots.mkdir(parents=True, exist_ok=True)
 
+    email = f"e2e{int(time.time())}@example.com"
     tmp = Path(tempfile.mkdtemp())
     log_path = tmp / "api.log"
     env = {**os.environ, "ENVIRONMENT": "development",
            "DATABASE_URL": f"sqlite:///{tmp / 'e2e.db'}", "OTP_DELIVERY": "console",
            "CORS_ORIGINS": web_url}
+    if args.live_fake:
+        env |= {"MARKET_DATA_MODE": "INDSTOCKS", "INDSTOCKS_DATA_USER_EMAILS": email}
     backend = ROOT / "backend"
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=backend, env=env,
                    check=True, capture_output=True)
     log = open(log_path, "w")  # noqa: SIM115
+    cmd = ([sys.executable, str(ROOT / "scripts" / "fake_live_api.py")] if args.live_fake
+           else [sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8000"])
     api = subprocess.Popen(  # noqa: S603
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8000"],
-        cwd=backend, env=env, stdout=log, stderr=subprocess.STDOUT,
+        cmd, cwd=backend, env=env, stdout=log, stderr=subprocess.STDOUT,
     )
     handler = functools.partial(SpaHandler, directory=str(Path(args.dist).resolve()))
     web = http.server.ThreadingHTTPServer(("127.0.0.1", args.web_port), handler)
     threading.Thread(target=web.serve_forever, daemon=True).start()
 
-    email = f"e2e{int(time.time())}@example.com"
     try:
         wait_for(f"{API}/api/v1/health/live")
         with sync_playwright() as p:
@@ -110,8 +115,10 @@ def main() -> int:
             page.get_by_test_id("verify-submit").click()
 
             expect(page.get_by_text("Hi, Asha")).to_be_visible(timeout=10_000)
-            expect(page.get_by_test_id("badge-demo").first).to_be_visible(timeout=10_000)
-            expect(page.get_by_test_id("demo-disclaimer")).to_be_visible()
+            badge = "badge-live" if args.live_fake else "badge-demo"
+            expect(page.get_by_test_id(badge).first).to_be_visible(timeout=10_000)
+            if not args.live_fake:
+                expect(page.get_by_test_id("demo-disclaimer")).to_be_visible()
             expect(page.get_by_test_id("trading-mode-banner")).to_contain_text("LIVE LOCKED")
             if shots:
                 page.screenshot(path=str(shots / "02-home.png"), full_page=True)
@@ -123,7 +130,10 @@ def main() -> int:
             # Option chain from the Home quick action.
             page.get_by_test_id("qa-options").click()
             expect(page.get_by_test_id("option-chain-table")).to_be_visible(timeout=10_000)
-            expect(page.get_by_test_id("chain-metadata-note")).to_contain_text("Lot size")
+            if args.live_fake:
+                expect(page.get_by_text("Lot size: 75")).to_be_visible()
+            else:
+                expect(page.get_by_test_id("chain-metadata-note")).to_contain_text("Lot size")
             shot("03-option-chain")
             page.go_back()
 
@@ -133,6 +143,8 @@ def main() -> int:
             shot("04-markets")
             page.get_by_test_id("quote-NIFTY").click()
             expect(page.get_by_test_id("candle-chart")).to_be_visible(timeout=10_000)
+            if args.live_fake:
+                expect(page.get_by_test_id("chart-proxy-note")).to_contain_text("futures")
             shot("05-chart")
             page.go_back()
 

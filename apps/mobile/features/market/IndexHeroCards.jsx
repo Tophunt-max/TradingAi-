@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { AppText, DataSourceBadge, PnLText, Skeleton, StateView } from '../../components/ui';
 import { isStale } from '../system/api';
+import { formatPrice } from '../../services/format';
+import { QualityBanner } from './QualityBanner';
 import { useQuotes } from './api';
 
 export function IndexHeroCards({ symbols = 'NIFTY,BANKNIFTY' }) {
@@ -14,7 +16,7 @@ export function IndexHeroCards({ symbols = 'NIFTY,BANKNIFTY' }) {
     <View style={{ gap: 8 }}>
     <View style={{ flexDirection: 'row', gap: 12 }}>
       {(q.data?.items ?? [null, null]).map((it, i) => {
-        const up = it ? Number(it.change) >= 0 : true;
+        const up = it && it.change != null ? Number(it.change) >= 0 : true;
         return (
           <Pressable
             key={it?.symbol ?? i}
@@ -39,7 +41,7 @@ export function IndexHeroCards({ symbols = 'NIFTY,BANKNIFTY' }) {
                   <DataSourceBadge source={q.data.source} stale={stale} />
                 </View>
                 <AppText variant="title" style={{ fontVariant: ['tabular-nums'] }}>
-                  {Number(it.last).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {formatPrice(it.last)}
                 </AppText>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <PnLText value={it.change} variant="caption" />
@@ -60,6 +62,7 @@ export function IndexHeroCards({ symbols = 'NIFTY,BANKNIFTY' }) {
     {q.data?.is_demo ? (
       <AppText variant="caption" tone="warning" testID="demo-disclaimer">{q.data.disclaimer}</AppText>
     ) : null}
+    {q.data && !q.data.is_demo ? <QualityBanner payload={q.data} /> : null}
     </View>
   );
 }

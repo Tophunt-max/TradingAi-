@@ -61,6 +61,12 @@ served at `http://localhost:8000/docs` in development and test only.
 | GET | `/portfolio`, `/orders`, `/positions` | ✓ | Real paper ledger (empty until Phase 6) |
 | GET | `/alerts?category=` | ✓ | Derived from your audit trail |
 | GET | `/brokers` | ✓ | Paper adapter + planned brokers (none integrated) |
+| GET | `/market/provider-status` | ✓ | Provider health, instrument-sync times, price-feed heartbeat |
+| POST | `/admin/market-data/sync-instruments` | admin | Download the INDstocks instrument master |
+
+Every market-data response (quotes, candles, option chain, analysis) also carries
+`provider`, `quality: {status: OK|WARN|FAIL, issues: [...]}` and `notes`. In INDSTOCKS mode
+only users in `INDSTOCKS_DATA_USER_EMAILS` get data (others: `403 MARKET_DATA_NOT_LICENSED`).
 
 ## Example requests
 

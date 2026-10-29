@@ -29,6 +29,8 @@ class MarketDataMode(StrEnum):
     DEMO = "DEMO"
     # No provider configured: market endpoints return 503.
     DISABLED = "DISABLED"
+    # INDstocks (INDmoney) official API, using the account owner's access token.
+    INDSTOCKS = "INDSTOCKS"
 
 
 class Settings(BaseSettings):
@@ -72,10 +74,27 @@ class Settings(BaseSettings):
     # Live trading is hard-locked: no verified broker adapter exists yet.
     live_trading_enabled: bool = False
 
+    # INDstocks market data (https://api-docs.indstocks.com). Secrets stay server-side.
+    indstocks_base_url: str = "https://api.indstocks.com"
+    indstocks_ws_url: str = "wss://ws-prices.indstocks.com/api/v1/ws/prices"
+    indstocks_access_token: SecretStr | None = None
+    indstocks_timeout_seconds: float = Field(default=8.0, gt=0, le=60)
+    # The data comes from one person's brokerage account. Only these app users
+    # (comma-separated emails) may see it; others get 403. Empty = nobody.
+    indstocks_data_user_emails: Annotated[list[str], NoDecode] = []
+    # Optional, verify before use: REST quote codes for indices, e.g.
+    # "NIFTY=NSE_123,BANKNIFTY=NSE_456". Undocumented by INDstocks, so empty by default.
+    indstocks_index_quote_codes: str = ""
+    # Quotes older than this during market hours are flagged STALE.
+    stale_quote_seconds: int = Field(default=60, ge=5, le=3600)
+    # Exchange holidays (YYYY-MM-DD, comma-separated). Not bundled: must be maintained.
+    market_holidays: Annotated[list[str], NoDecode] = []
+
     # Verification-code delivery: "console" (development only) or "none".
     otp_delivery: str = "console"
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "indstocks_data_user_emails", "market_holidays",
+                     mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:
         if isinstance(v, str):
@@ -100,6 +119,10 @@ class Settings(BaseSettings):
                 raise ValueError("Console OTP delivery is only allowed in development/test.")
             if self.debug:
                 raise ValueError("DEBUG must be off outside development/test.")
+        if (self.market_data_mode == MarketDataMode.INDSTOCKS and not self.is_dev_like
+                and not self.indstocks_access_token):
+            raise ValueError(
+                "INDSTOCKS_ACCESS_TOKEN is required when MARKET_DATA_MODE=INDSTOCKS.")
         if self.live_trading_enabled:
             raise ValueError(
                 "LIVE_TRADING_ENABLED cannot be true: no verified broker adapter is "

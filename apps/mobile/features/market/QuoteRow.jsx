@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { AppText, PnLText } from '../../components/ui';
+import { formatPrice } from '../../services/format';
 
 export function QuoteRow({ q, right, testID }) {
   const theme = useTheme();
@@ -19,7 +20,7 @@ export function QuoteRow({ q, right, testID }) {
       </View>
       {right}
       <View style={{ alignItems: 'flex-end', minWidth: 110 }}>
-        <AppText variant="mono">{Number(q.last).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</AppText>
+        <AppText variant="mono">{formatPrice(q.last)}</AppText>
         <View style={{ flexDirection: 'row', gap: 4 }}>
           <PnLText value={q.change} variant="caption" />
           <PnLText value={q.change_pct} prefix="(" suffix="%)" variant="caption" />

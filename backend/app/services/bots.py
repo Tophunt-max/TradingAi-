@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import re
 import uuid
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import MarketDataMode, Settings
 from app.core.errors import ConflictError, NotFoundError
+from app.core.time import IST, utcnow
+from app.market_data.factory import build_provider
 from app.models.bots import Bot, BotConfigVersion, BotCreationMethod, RiskSettings
+from app.models.instruments import Instrument
 from app.schemas.bots import (
     AiDraftRequest,
     AiDraftResponse,
@@ -99,7 +104,46 @@ def clone(db: Session, user_id: uuid.UUID, bot: Bot) -> Bot:
     return create(db, user_id, cfg, BotCreationMethod.CLONE)
 
 
-def validate(bot: Bot, cfg: BotConfig, rs: RiskSettings) -> ValidationReport:
+@dataclass
+class MarketContext:
+    """What the market-data layer knows about the bot's contract right now."""
+
+    mode: str  # DEMO | INDSTOCKS | DISABLED
+    provider_ok: bool = False
+    provider_detail: str | None = None
+    contract: Instrument | None = None
+
+
+def market_context(db: Session, settings: Settings, cfg: BotConfig) -> MarketContext:
+    mode = settings.market_data_mode.value
+    if settings.market_data_mode != MarketDataMode.INDSTOCKS:
+        return MarketContext(mode=mode)
+    today = utcnow().astimezone(IST).date()
+    contract = db.scalar(
+        select(Instrument)
+        .where(
+            Instrument.provider == "INDSTOCKS",
+            Instrument.source == "fno",
+            Instrument.symbol_name == cfg.instrument.underlying,
+            Instrument.instrument_name == "OPTIDX",
+            Instrument.option_type == cfg.instrument.option_type,
+            Instrument.expiry_date >= today,
+        )
+        .order_by(Instrument.expiry_date)
+        .limit(1)
+    )
+    try:
+        st = build_provider(db, settings).status()
+        ok, detail = st.get("status") == "ok", st.get("detail")
+    except Exception as exc:  # status must never break validation
+        ok, detail = False, type(exc).__name__
+    return MarketContext(mode=mode, provider_ok=ok, provider_detail=detail, contract=contract)
+
+
+def validate(
+    bot: Bot, cfg: BotConfig, rs: RiskSettings, market: MarketContext | None = None
+) -> ValidationReport:
+    market = market or MarketContext(mode="DEMO")
     checks: list[ValidationCheck] = []
 
     def add(key: str, label: str, ok: bool | None, message: str) -> None:
@@ -116,11 +160,27 @@ def validate(bot: Bot, cfg: BotConfig, rs: RiskSettings) -> ValidationReport:
              f"({', '.join(strat['timeframes'])}).")
     add("instrument", "Instrument eligibility", True,
         f"{cfg.instrument.underlying} {cfg.instrument.option_type} options buying.")
-    add("contract", "Contract, lot and tick size", False,
-        "No authorised instrument master yet (Phase 3), so the lot size, tick size and "
-        "expiry cannot be verified.")
-    add("data", "Market data", False,
-        "Only synthetic DEMO data is available. Trading decisions need a live, authorised feed.")
+    c = market.contract
+    if c is not None:
+        add("contract", "Contract, lot and tick size", True,
+            f"Nearest expiry {c.expiry_date:%d %b %Y}: lot size {c.lot_size}, tick size "
+            f"{c.tick_size.normalize() if c.tick_size is not None else 'unknown'} "
+            "(INDstocks instrument master).")
+    elif market.mode == "INDSTOCKS":
+        add("contract", "Contract, lot and tick size", False,
+            "No current contract found in the instrument master. Run an instrument sync.")
+    else:
+        add("contract", "Contract, lot and tick size", False,
+            "DEMO mode has no instrument master, so lot size, tick size and expiry cannot be "
+            "verified.")
+    if market.mode == "INDSTOCKS":
+        add("data", "Market data", market.provider_ok,
+            "INDstocks data is available." if market.provider_ok
+            else f"INDstocks is not usable: {market.provider_detail}.")
+    else:
+        add("data", "Market data", False,
+            "Only synthetic DEMO data is available. Trading decisions need a live, authorised "
+            "feed.")
     add("capital", "Capital allocation", cfg.risk.capital_allocation <= rs.capital,
         f"{inr(cfg.risk.capital_allocation)} of {inr(rs.capital)} global capital."
         if cfg.risk.capital_allocation <= rs.capital

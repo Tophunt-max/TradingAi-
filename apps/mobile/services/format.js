@@ -13,6 +13,21 @@ export function formatIST(iso, { withDate = false } = {}) {
   });
 }
 
+/** Price with Indian grouping; '—' when the provider sent nothing. */
+export function formatPrice(value, digits = 2) {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+/** Fixed decimals for nullable numbers. */
+export function fixed(value, digits = 2) {
+  if (value === null || value === undefined) return '—';
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(digits) : '—';
+}
+
 export function formatINR(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';

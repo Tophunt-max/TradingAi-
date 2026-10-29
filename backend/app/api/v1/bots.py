@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, status
 from sqlalchemy import select
 
-from app.api.deps import AuthDep, DbDep
+from app.api.deps import AuthDep, DbDep, SettingsDep
 from app.core.errors import AppError
 from app.models.bots import Bot, BotCreationMethod, BotStatus
 from app.schemas.bots import (
@@ -107,11 +107,14 @@ def delete_bot(bot_id: uuid.UUID, ctx: AuthDep, db: DbDep, request: Request,
 
 
 @router.post("/{bot_id}/validate", response_model=ValidationReport)
-def validate_bot(bot_id: uuid.UUID, ctx: AuthDep, db: DbDep) -> ValidationReport:
+def validate_bot(
+    bot_id: uuid.UUID, ctx: AuthDep, db: DbDep, settings: SettingsDep
+) -> ValidationReport:
     bot = svc.get_owned(db, ctx.user.id, bot_id)
     rs = risk_svc.get_or_create(db, ctx.user.id)
     db.commit()
-    return svc.validate(bot, svc.current_config(bot), rs)
+    cfg = svc.current_config(bot)
+    return svc.validate(bot, cfg, rs, svc.market_context(db, settings, cfg))
 
 
 def _lifecycle(action: str):  # type: ignore[no-untyped-def]

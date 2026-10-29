@@ -32,5 +32,19 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  # INDstocks price feed. Start with: docker compose --profile live up price-feed
+  # Pass instruments as SEGMENT:TOKEN (see docs/indstocks.md).
+  price-feed:
+    build: ./backend
+    profiles: ["live"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://quantai:${POSTGRES_PASSWORD:-quantai_dev_only}@postgres:5432/quantai
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "-m", "app.workers.price_feed", "${PRICE_FEED_INSTRUMENTS:-NSE:2885}"]
+    restart: unless-stopped
+    depends_on:
+      redis: { condition: service_healthy }
+
 volumes:
   pgdata:

@@ -32,6 +32,9 @@ export function AppText({ variant = 'body', tone = 'default', style, children, .
 
 // Formats a signed number with colour: green positive, red negative.
 export function PnLText({ value, suffix = '', prefix = '', variant = 'mono', style }) {
+  if (value === null || value === undefined || value === '') {
+    return <AppText variant={variant} tone="faint" style={style}>—</AppText>;
+  }
   const n = Number(value);
   const tone = n > 0 ? 'positive' : n < 0 ? 'negative' : 'muted';
   const sign = n > 0 ? '+' : '';

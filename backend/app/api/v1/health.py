@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.deps import DbDep, SettingsDep
+from app.core.config import MarketDataMode, Settings
 from app.core.time import utcnow
+from app.market_data.factory import build_provider
 
 router = APIRouter(prefix="/health", tags=["health"])
 logger = logging.getLogger("app.health")
@@ -27,6 +31,39 @@ class HealthReport(BaseModel):
     status: Literal["ok", "degraded", "down"]
     checked_at: str
     components: list[ComponentHealth]
+
+
+def _market_data_health(db: Session, settings: Settings) -> list[ComponentHealth]:
+    if settings.market_data_mode == MarketDataMode.DEMO:
+        return [ComponentHealth(name="market_data", status="degraded",
+                                detail="DEMO mode: synthetic data only."),
+                ComponentHealth(name="market_data_worker", status="not_configured",
+                                detail="Not used in DEMO mode.")]
+    if settings.market_data_mode != MarketDataMode.INDSTOCKS:
+        return [ComponentHealth(name="market_data", status="down",
+                                detail="No market-data provider configured.")]
+    try:
+        st = build_provider(db, settings).status()
+    except Exception as exc:
+        logger.exception("market_data_health_failed")
+        return [ComponentHealth(name="market_data", status="down", detail=type(exc).__name__)]
+    syncs = st.get("instrument_sync") or {}
+    missing = [s for s, v in syncs.items() if not v]
+    status = "down" if st["status"] != "ok" else ("degraded" if missing else "ok")
+    out = [ComponentHealth(
+        name="market_data", status=status,
+        detail=f"INDstocks: {st.get('detail')}"
+        + (f" Instrument master not synced: {', '.join(missing)}." if missing else ""))]
+    hb = st.get("price_feed_heartbeat")
+    if hb is None:
+        out.append(ComponentHealth(name="market_data_worker", status="not_configured",
+                                   detail="Price-feed worker has not reported (needs REDIS_URL)."))
+    else:
+        age = (utcnow() - datetime.fromisoformat(hb)).total_seconds()
+        out.append(ComponentHealth(name="market_data_worker",
+                                   status="ok" if age < 120 else "degraded",
+                                   detail=f"Last heartbeat {int(age)}s ago."))
+    return out
 
 
 @router.get("/live")
@@ -62,8 +99,10 @@ def ready(db: DbDep, settings: SettingsDep) -> JSONResponse:
         components.append(ComponentHealth(name="redis", status="not_configured",
                                           detail="In-memory rate limiting (dev only)."))
 
-    # Workers and broker integrations do not exist yet (Phases 3, 5, 6, 8).
-    for name in ("market_data_worker", "ai_worker", "execution_worker", "broker"):
+    components.extend(_market_data_health(db, settings))
+
+    # Workers and broker integrations not built yet (Phases 5, 6, 8).
+    for name in ("ai_worker", "execution_worker", "broker"):
         components.append(ComponentHealth(name=name, status="not_configured",
                                           detail="Not implemented in this build."))
 

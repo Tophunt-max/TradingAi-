@@ -4,10 +4,10 @@ import { useQuotes } from '../../features/market/api';
 import { QuoteRow } from '../../features/market/QuoteRow';
 
 const FILTERS = {
-  gainers: { label: 'Top gainers', fn: (q) => Number(q.change_pct) > 0, sort: (a, b) => b.change_pct - a.change_pct },
-  losers: { label: 'Top losers', fn: (q) => Number(q.change_pct) < 0, sort: (a, b) => a.change_pct - b.change_pct },
-  volume: { label: 'Volume breakout', fn: (q) => q.relative_volume >= 1.5, sort: (a, b) => b.relative_volume - a.relative_volume },
-  range: { label: 'Near day high', fn: (q) => (Number(q.day_high) - Number(q.last)) / Number(q.last) < 0.002, sort: (a, b) => b.change_pct - a.change_pct },
+  gainers: { label: 'Top gainers', fn: (q) => q.change_pct != null && Number(q.change_pct) > 0, sort: (a, b) => b.change_pct - a.change_pct },
+  losers: { label: 'Top losers', fn: (q) => q.change_pct != null && Number(q.change_pct) < 0, sort: (a, b) => a.change_pct - b.change_pct },
+  volume: { label: 'Volume breakout', fn: (q) => (q.relative_volume ?? 0) >= 1.5, sort: (a, b) => b.relative_volume - a.relative_volume },
+  range: { label: 'Near day high', fn: (q) => q.day_high != null && q.last != null && (Number(q.day_high) - Number(q.last)) / Number(q.last) < 0.002, sort: (a, b) => b.change_pct - a.change_pct },
   options: { label: 'Has options', fn: (q) => q.has_options, sort: (a, b) => a.symbol.localeCompare(b.symbol) },
 };
 
@@ -31,7 +31,7 @@ export default function Screener() {
           </Card>
         )}
       </QueryState>
-      <AppText variant="caption" tone="faint">OI-change and options-liquidity filters need the live option chain feed (Phase 3).</AppText>
+      <AppText variant="caption" tone="faint">The screener covers the app watch universe. Relative volume needs volume history, so it is shown only where the provider supplies it.</AppText>
     </Screen>
   );
 }

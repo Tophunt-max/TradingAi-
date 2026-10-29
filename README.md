@@ -10,7 +10,20 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 > not live profits and do not guarantee future returns. **Live trading is disabled in
 > this build.**
 
-## Current status: Phase 2 (mobile UI) complete
+## Current status: Phase 3 (market data) complete, not yet verified with a real INDstocks token
+
+Phase 3 connects QuantAI to the official **INDstocks (INDmoney) API** for read-only market data:
+instrument master (lot/tick size, expiries), stock quotes, candles, the option chain with
+INDstocks Greeks and IV, and a WebSocket price-feed worker. Every market payload now reports its
+provider, time and a data-quality check. Setup and the remaining verification steps are in
+[docs/indstocks.md](docs/indstocks.md). DEMO mode is still the default.
+
+Known limits of the INDstocks API that the app shows to the user:
+- **Index level** comes from the option chain, so there is no day change.
+- **Index charts** use near-month futures as a labelled proxy.
+- **The REST quote has no timestamp.** Staleness is detected only for instruments streamed by the price-feed worker.
+
+## Phase 2 (mobile UI)
 
 Phase 2 added the screens from the design mockup, wired to real API contracts:
 Home dashboard, Markets (indices, stocks, movers, search), candlestick chart with
@@ -88,7 +101,7 @@ python scripts/e2e_web_smoke.py --dist apps/mobile/dist      # browser E2E (need
 |---|---|
 | 1 ✅ | Foundation: repo, design system, auth, DB, API, navigation, demo mode |
 | 2 ✅ | Mobile UI for dashboard, markets, charts, option chain, AI, bots, orders, positions, portfolio, risk center, alerts, wired to typed contracts |
-| 3 | Authorised market-data provider, instrument master, candles, live updates, option chain, data-quality validation |
+| 3 ✅ | Authorised market-data provider (INDstocks), instrument master, candles, live updates, option chain, data-quality validation |
 | 4 | Indicators, candlestick patterns, SMC, regime detection, strategy router, baseline AI predictions, explanations |
 | 5 | Bot system: AI Auto Create, manual builder, templates, validation, lifecycle, persistent workers |
 | 6 | Global risk manager, order state machine, simulated fills, charges, restart recovery, kill switch |
@@ -119,6 +132,12 @@ AI Analysis, My Bots, AI Auto Create, Manual Bot Builder, Templates, Bot Details
 Risk Center (kill switch ke saath), Notifications, Broker Connections, Screener aur Learn & Grow.
 Bots aur risk limits database mein save hote hain. Orders aur P&L abhi khaali hain (Phase 6 se bharenge),
 aur AI probability tab tak nahi dikhegi jab tak calibrated model ready nahi hota.
+
+**Phase 3 mein kya aaya:** INDstocks (INDmoney) API se read-only market data aata hai: instrument master
+(lot size, tick size, expiry), stock quotes, candles, option chain (Greeks/IV ke saath) aur live price feed worker.
+Har screen par dikhta hai ki data kahan se aaya, kab aaya, aur quality check pass hua ya nahi.
+Setup ke liye `docs/indstocks.md` dekhein. Access token sirf server ki `.env` mein rakhein, app mein kabhi nahi.
+Yeh integration abhi asli INDstocks token ke saath test nahi hua hai.
 
 **Abhi kya baaki hai:** Real market data, AI analysis, bots, risk manager, paper
 execution, backtesting aur broker integration. Ye sab agle phases mein banenge. Jo screen

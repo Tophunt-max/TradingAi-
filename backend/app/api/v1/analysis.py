@@ -6,11 +6,9 @@ from fastapi import APIRouter, Path, Query
 from pydantic import BaseModel
 
 from app.analysis.technical_summary import summarize
-from app.api.deps import AuthDep, SettingsDep
-from app.api.v1.market import Provenance, demo_provenance, require_demo
-from app.core.errors import NotFoundError
-from app.core.time import utcnow
-from app.market_data import demo
+from app.api.v1.market import Provenance
+from app.core.errors import ServiceUnavailableError
+from app.market_data.factory import ProviderDep, provider_errors
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -40,16 +38,18 @@ class AnalysisPayload(Provenance):
 
 @router.get("/{symbol}", response_model=AnalysisPayload)
 def analyse(
-    _: AuthDep,
-    settings: SettingsDep,
+    provider: ProviderDep,
     symbol: Annotated[str, Path(max_length=32)],
     timeframe: Annotated[Literal["5m", "15m", "1h", "1d"], Query()] = "15m",
 ) -> AnalysisPayload:
-    require_demo(settings)
-    sym = symbol.upper()
-    if sym not in demo.INSTRUMENTS:
-        raise NotFoundError(f"Unknown instrument '{symbol}'.")
-    now = utcnow()
-    rows = demo.candles(sym, timeframe, now, 150)
-    return AnalysisPayload(**demo_provenance(now), symbol=sym, timeframe=timeframe,
-                           **summarize(rows, is_demo=True))
+    with provider_errors():
+        r = provider.candles(symbol.upper(), timeframe, 150)
+    if len(r.data) < 60:
+        raise ServiceUnavailableError("Not enough clean candles to analyse.",
+                                      code="INSUFFICIENT_DATA",
+                                      details=r.quality.as_dict())
+    out = summarize(r.data, is_demo=r.is_demo)
+    if r.quality.status == "FAIL":
+        out["abstain_reasons"].insert(0, "Market-data quality check failed for this window.")
+    out["abstain_reasons"].extend(r.notes[:-1])  # e.g. futures-proxy note
+    return AnalysisPayload(**r.provenance(), symbol=symbol.upper(), timeframe=timeframe, **out)

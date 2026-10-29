@@ -697,6 +697,37 @@
         }
       }
     },
+    "/api/v1/admin/market-data/sync-instruments": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Sync Instruments",
+        "description": "Download the INDstocks instrument master (index, equity, fno).",
+        "operationId": "sync_instruments_api_v1_admin_market_data_sync_instruments_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyncResult"
+                  },
+                  "type": "array",
+                  "title": "Response Sync Instruments Api V1 Admin Market Data Sync Instruments Post"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/audit-logs": {
       "get": {
         "tags": [
@@ -989,6 +1020,32 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/market/provider-status": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Provider Status",
+        "operationId": "provider_status_api_v1_market_provider_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/charts/{symbol}/candles": {
@@ -2491,6 +2548,10 @@
             ],
             "title": "Source"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "is_demo": {
             "type": "boolean",
             "title": "Is Demo"
@@ -2514,6 +2575,16 @@
               }
             ],
             "title": "Disclaimer"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
           },
           "symbol": {
             "type": "string",
@@ -2627,10 +2698,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "symbol",
           "timeframe",
           "last_price",
@@ -3307,6 +3381,10 @@
             ],
             "title": "Source"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "is_demo": {
             "type": "boolean",
             "title": "Is Demo"
@@ -3330,6 +3408,16 @@
               }
             ],
             "title": "Disclaimer"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
           },
           "symbol": {
             "type": "string",
@@ -3371,10 +3459,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "symbol",
           "timeframe",
           "candles",
@@ -3393,6 +3484,10 @@
               "DELAYED"
             ],
             "title": "Source"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
           },
           "is_demo": {
             "type": "boolean",
@@ -3418,6 +3513,16 @@
             ],
             "title": "Disclaimer"
           },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
           "underlying": {
             "type": "string",
             "title": "Underlying"
@@ -3432,15 +3537,36 @@
             "title": "Expiry"
           },
           "spot": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Spot"
           },
           "atm_strike": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Atm Strike"
           },
           "strike_step": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Strike Step"
           },
           "lot_size": {
@@ -3464,6 +3590,17 @@
               }
             ],
             "title": "Tick Size"
+          },
+          "freeze_qty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freeze Qty"
           },
           "pcr": {
             "anyOf": [
@@ -3495,10 +3632,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "underlying",
           "underlying_name",
           "expiry",
@@ -3517,7 +3657,7 @@
       "ChainRow": {
         "properties": {
           "strike": {
-            "type": "integer",
+            "type": "number",
             "title": "Strike"
           },
           "is_atm": {
@@ -3525,10 +3665,24 @@
             "title": "Is Atm"
           },
           "call": {
-            "$ref": "#/components/schemas/OptionSide"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "put": {
-            "$ref": "#/components/schemas/OptionSide"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OptionSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3755,6 +3909,10 @@
             ],
             "title": "Source"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "is_demo": {
             "type": "boolean",
             "title": "Is Demo"
@@ -3779,6 +3937,16 @@
             ],
             "title": "Disclaimer"
           },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
           "underlying": {
             "type": "string",
             "title": "Underlying"
@@ -3799,10 +3967,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "underlying",
           "expiries",
           "metadata_note"
@@ -3923,19 +4094,47 @@
             "title": "Exchange"
           },
           "last": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Last"
           },
           "prev_close": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Prev Close"
           },
           "change": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Change"
           },
           "change_pct": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Change Pct"
           }
         },
@@ -4127,7 +4326,8 @@
         "type": "string",
         "enum": [
           "DEMO",
-          "DISABLED"
+          "DISABLED",
+          "INDSTOCKS"
         ],
         "title": "MarketDataMode"
       },
@@ -4141,6 +4341,10 @@
               "DELAYED"
             ],
             "title": "Source"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
           },
           "is_demo": {
             "type": "boolean",
@@ -4166,6 +4370,16 @@
             ],
             "title": "Disclaimer"
           },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/IndexQuote"
@@ -4177,10 +4391,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "items"
         ],
         "title": "MarketPayload"
@@ -4209,6 +4426,10 @@
             ],
             "title": "Source"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "is_demo": {
             "type": "boolean",
             "title": "Is Demo"
@@ -4232,6 +4453,16 @@
               }
             ],
             "title": "Disclaimer"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
           },
           "gainers": {
             "items": {
@@ -4258,10 +4489,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "gainers",
           "losers",
           "volume_leaders"
@@ -4292,48 +4526,147 @@
       },
       "OptionSide": {
         "properties": {
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "trading_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trading Symbol"
+          },
           "ltp": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ltp"
           },
           "bid": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Bid"
           },
           "ask": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ask"
           },
           "iv": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Iv"
           },
           "delta": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Delta"
           },
           "gamma": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Gamma"
           },
           "theta": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Theta"
           },
           "vega": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Vega"
           },
           "oi": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Oi"
           },
           "oi_change": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Oi Change"
           },
           "volume": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Volume"
           }
         },
@@ -4860,6 +5193,137 @@
         "type": "object",
         "title": "PreferencesUpdate"
       },
+      "ProviderStatus": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "instrument_sync": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Sync"
+          },
+          "price_feed_heartbeat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Feed Heartbeat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "provider",
+          "status"
+        ],
+        "title": "ProviderStatus"
+      },
+      "Quality": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "WARN",
+              "FAIL"
+            ],
+            "title": "Status"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/QualityIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "title": "Quality"
+      },
+      "QualityIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "WARN",
+              "FAIL"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "QualityIssue"
+      },
       "Quote": {
         "properties": {
           "symbol": {
@@ -4875,19 +5339,47 @@
             "title": "Exchange"
           },
           "last": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Last"
           },
           "prev_close": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Prev Close"
           },
           "change": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Change"
           },
           "change_pct": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Change Pct"
           },
           "segment": {
@@ -4906,11 +5398,25 @@
             "title": "Sector"
           },
           "day_high": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Day High"
           },
           "day_low": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Day Low"
           },
           "volume": {
@@ -4925,7 +5431,14 @@
             "title": "Volume"
           },
           "relative_volume": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Relative Volume"
           },
           "has_options": {
@@ -4963,6 +5476,10 @@
             ],
             "title": "Source"
           },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
           "is_demo": {
             "type": "boolean",
             "title": "Is Demo"
@@ -4987,6 +5504,16 @@
             ],
             "title": "Disclaimer"
           },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/Quote"
@@ -4998,10 +5525,13 @@
         "type": "object",
         "required": [
           "source",
+          "provider",
           "is_demo",
           "is_live",
           "as_of",
           "disclaimer",
+          "quality",
+          "notes",
           "items"
         ],
         "title": "QuotesPayload"
@@ -5760,6 +6290,46 @@
           "default_entry"
         ],
         "title": "StrategyOut"
+      },
+      "SyncResult": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "rejected_rows": {
+            "type": "integer",
+            "title": "Rejected Rows"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "status",
+          "row_count",
+          "rejected_rows",
+          "message"
+        ],
+        "title": "SyncResult"
       },
       "SystemStatus": {
         "properties": {

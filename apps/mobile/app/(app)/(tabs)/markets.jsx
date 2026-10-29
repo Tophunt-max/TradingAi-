@@ -6,6 +6,7 @@ import { useMovers, useQuotes, useSearch } from '../../../features/market/api';
 import { QuoteRow } from '../../../features/market/QuoteRow';
 import { isStale } from '../../../features/system/api';
 import { formatIST } from '../../../services/format';
+import { QualityBanner } from '../../../features/market/QualityBanner';
 
 function QuoteList({ segment }) {
   const q = useQuotes(segment);
@@ -13,7 +14,8 @@ function QuoteList({ segment }) {
     <QueryState query={q} isEmpty={(d) => !d.items.length}>
       {(d) => (
         <Card>
-          <CardHeader title={segment === 'INDEX' ? 'Indices' : 'Stocks'} subtitle={`As of ${formatIST(d.as_of)} IST`} right={<DataSourceBadge source={d.source} stale={isStale(d.as_of)} />} />
+          <CardHeader title={segment === 'INDEX' ? 'Indices' : 'Stocks'} subtitle={`${d.provider} · as of ${formatIST(d.as_of)} IST`} right={<DataSourceBadge source={d.source} stale={isStale(d.as_of) || d.quality?.status === 'FAIL'} />} />
+          <QualityBanner payload={d} />
           {d.items.map((it) => <QuoteRow key={it.symbol} q={it} />)}
         </Card>
       )}

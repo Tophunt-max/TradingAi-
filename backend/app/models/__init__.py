@@ -16,10 +16,13 @@ from app.models.bots import (
     RiskSettings,
     TradingMode,
 )
+from app.models.instruments import Instrument, InstrumentSync
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
     "AuditLog",
+    "Instrument",
+    "InstrumentSync",
     "Bot",
     "BotConfigVersion",
     "BotCreationMethod",
