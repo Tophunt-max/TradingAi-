@@ -40,7 +40,8 @@ def event(db: Session, bot: Bot, run: BotRun | None, level: str, kind: str, mess
                     kind=kind, message=message[:500], data=data))
 
 
-def transition(db: Session, bot: Bot, action: str, reason: str) -> BotRun | None:
+def transition(db: Session, bot: Bot, action: str, reason: str,
+               mode: str = "SIGNAL_ONLY") -> BotRun | None:
     allowed, target = TRANSITIONS[action]
     now = utcnow()
     res = db.execute(
@@ -59,7 +60,7 @@ def transition(db: Session, bot: Bot, action: str, reason: str) -> BotRun | None
         if run is not None:  # defensive: never two open runs
             run.status, run.ended_at, run.end_reason = "ENDED", now, "superseded"
         run = BotRun(bot_id=bot.id, user_id=bot.user_id, config_version=bot.current_version,
-                     mode="SIGNAL_ONLY", status="RUNNING", started_at=now)
+                     mode=mode, status="RUNNING", started_at=now)
         db.add(run)
         db.flush()
     elif run is not None:

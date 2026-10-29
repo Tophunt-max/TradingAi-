@@ -218,7 +218,7 @@ export function SetupCard({ setup, options }) {
           <AppText variant="caption" tone="faint">{options.note}</AppText>
         </>
       ) : null}
-      <AppText variant="caption" tone="warning" style={{ marginTop: 6 }}>This is not a trade proposal. Costs and the risk manager must approve any trade (Phase 6).</AppText>
+      <AppText variant="caption" tone="warning" style={{ marginTop: 6 }}>This is not a trade proposal. Any paper trade must still pass the charges check and the global risk manager.</AppText>
     </Card>
   );
 }

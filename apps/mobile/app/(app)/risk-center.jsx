@@ -21,8 +21,10 @@ function EditLimits({ limits, onClose }) {
   const update = useUpdateRiskLimits();
   const [form, setForm] = useState(() => Object.fromEntries(EDITABLE.map(([k]) => [k, String(limits[k] == null ? '' : Number.isNaN(Number(limits[k])) ? limits[k] : Number(limits[k]))])));
   const [reEntry, setReEntry] = useState(limits.re_entry_after_stop_loss);
+  const [exitOnLoss, setExitOnLoss] = useState(limits.exit_on_loss_limit);
+  const [squareOnKill, setSquareOnKill] = useState(limits.square_off_on_kill_switch);
   const submit = () => {
-    const patch = { re_entry_after_stop_loss: reEntry };
+    const patch = { re_entry_after_stop_loss: reEntry, exit_on_loss_limit: exitOnLoss, square_off_on_kill_switch: squareOnKill };
     EDITABLE.forEach(([k, , kb]) => {
       if (form[k] === '') return;
       patch[k] = kb === 'number-pad' ? Number(form[k]) : form[k];
@@ -36,6 +38,8 @@ function EditLimits({ limits, onClose }) {
         <TextField key={k} label={label} value={form[k]} keyboardType={kb} onChangeText={(v) => setForm((f) => ({ ...f, [k]: v }))} />
       ))}
       <ToggleRow title="Allow re-entry after stop-loss" value={reEntry} onValueChange={setReEntry} />
+      <ToggleRow title="Exit open positions at daily loss stop" subtitle="Off: only new entries are blocked" value={exitOnLoss} onValueChange={setExitOnLoss} />
+      <ToggleRow title="Square off positions on kill switch" subtitle="Off: kill switch only blocks entries and cancels pending orders" value={squareOnKill} onValueChange={setSquareOnKill} />
       {err ? <AppText tone="negative">{Array.isArray(err.details) && typeof err.details[0] === 'string' ? err.details.join(' ') : describeError(err)}</AppText> : null}
       <Button title="Save limits" loading={update.isPending} onPress={submit} testID="save-limits" />
       <AppText variant="caption" tone="faint">Only you can change these limits. Bots and AI components can read them but never modify them.</AppText>
@@ -57,13 +61,14 @@ export default function RiskCenter() {
       <QueryState query={risk}>
         {(r) => {
           const l = r.limits;
-          const used = Number(l.daily_loss_limit) ? (Math.max(-Number(r.usage.realized_pnl), 0) / Number(l.daily_loss_limit)) * 100 : 0;
+          const used = r.usage.daily_loss_used_pct;
+          const dayLoss = Math.max(-(Number(r.usage.realized_pnl) + Number(r.usage.unrealized_pnl)), 0);
           return (
             <>
               <Card style={{ alignItems: 'center', gap: 8 }}>
-                <ProgressRing percent={used} sublabel="Daily loss used" />
+                <ProgressRing percent={Math.min(used, 100)} sublabel="Daily loss used" />
                 <AppText variant="caption" tone="muted">
-                  {formatINR(Math.max(-Number(r.usage.realized_pnl), 0))} of {formatINR(l.daily_loss_limit)}
+                  {formatINR(dayLoss)} of {formatINR(l.daily_loss_limit)} (realised net + open mark-to-market)
                 </AppText>
               </Card>
               {!r.engine_active ? <NoticeBanner tone="info">{r.engine_note}</NoticeBanner> : null}
@@ -78,6 +83,8 @@ export default function RiskCenter() {
                 <KeyValue label="Max lots per trade" value={l.max_lots_per_trade} />
                 <KeyValue label="Re-entry after SL" value={l.re_entry_after_stop_loss ? 'Allowed' : 'Disabled'} />
                 <KeyValue label="Square-off" value={`${l.square_off_time_ist} IST`} />
+                <KeyValue label="At daily loss stop" value={l.exit_on_loss_limit ? 'Exit open positions' : 'Block entries only'} />
+                <KeyValue label="On kill switch" value={l.square_off_on_kill_switch ? 'Cancel pending + square off' : 'Cancel pending only'} />
               </Card>
               <Card>
                 <CardHeader title="Exposure & costs" />
@@ -86,6 +93,21 @@ export default function RiskCenter() {
                 <KeyValue label="Planned risk" value={formatINR(r.usage.planned_risk)} />
                 <KeyValue label="Estimated charges" value={formatINR(r.usage.estimated_charges)} />
                 <KeyValue label="Profit lock reached" value={r.usage.profit_lock_reached ? 'Yes' : 'No'} />
+              </Card>
+              <Card testID="exposure">
+                <CardHeader title="Exposure by bot" subtitle="Open positions and pending entries" />
+                {r.exposure.length ? (
+                  r.exposure.map((x) => (
+                    <View key={x.bot_id ?? 'manual'} style={{ paddingVertical: 4 }}>
+                      <AppText variant="bodyStrong">{x.bot_name ?? 'Manual trades'}</AppText>
+                      <AppText variant="caption" tone="muted">
+                        {x.positions} position(s) · {x.pending} pending · premium {formatINR(x.premium)} · planned risk {formatINR(x.planned_risk)} · {x.underlyings.join(', ')}
+                      </AppText>
+                    </View>
+                  ))
+                ) : (
+                  <AppText tone="muted">No open exposure.</AppText>
+                )}
               </Card>
               <Card>
                 <CardHeader title="New entries" />
@@ -117,7 +139,7 @@ export default function RiskCenter() {
                 title={confirm.engage ? 'Engage kill switch?' : 'Release kill switch?'}
                 message={
                   confirm.engage
-                    ? 'This blocks all new entries for every bot. Once execution exists it will also cancel pending entry orders and manage open positions safely.'
+                    ? `This blocks all new entries for every bot and cancels pending entry orders.${l.square_off_on_kill_switch ? ' Open paper positions get market exit orders; exits wait for a bid if market data is down.' : ' Open positions keep their stop-loss and target (square-off on kill switch is off).'}`
                     : 'New entries will be allowed again once all other checks pass.'
                 }
                 confirmLabel={confirm.engage ? 'Engage' : 'Release'}

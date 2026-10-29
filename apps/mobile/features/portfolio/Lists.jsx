@@ -1,108 +1,158 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { AppText, Badge, Card, ChipRow, KeyValue, NoticeBanner, QueryState, StateView, ToggleRow } from '../../components/ui';
-import { useOrders, usePositions } from '../trading/api';
-import { SAMPLE_ORDERS, SAMPLE_POSITIONS } from './samples';
-import { formatIST } from '../../services/format';
+import { router } from 'expo-router';
+import { AppText, Badge, Button, Card, ChipRow, ConfirmDialog, KeyValue, NoticeBanner, PnLText, QueryState, StateView } from '../../components/ui';
+import { useExitPosition, useOrders, usePositions } from '../trading/api';
+import { fixed, formatINR, formatIST } from '../../services/format';
 
-const ORDER_TONE = { PENDING: 'warning', EXECUTED: 'positive', CANCELLED: 'neutral', REJECTED: 'negative' };
+export const ORDER_TONE = {
+  CREATED: 'neutral',
+  VALIDATED: 'neutral',
+  SUBMITTED: 'warning',
+  ACKNOWLEDGED: 'warning',
+  PARTIALLY_FILLED: 'warning',
+  CANCEL_PENDING: 'warning',
+  UNKNOWN: 'negative',
+  RECONCILIATION_REQUIRED: 'negative',
+  FILLED: 'positive',
+  CANCELLED: 'neutral',
+  REJECTED: 'negative',
+};
 
-export function SampleToggle({ value, onChange }) {
+const EXIT_LABEL = {
+  STOP_LOSS: 'Stop-loss',
+  TARGET: 'Target',
+  TRAILING_STOP: 'Trailing stop',
+  SQUARE_OFF: 'Square-off time',
+  LOSS_LIMIT: 'Daily loss stop',
+  KILL_SWITCH: 'Kill switch',
+  MANUAL: 'Manual exit',
+};
+export const exitLabel = (r) => EXIT_LABEL[r] ?? r ?? '—';
+
+/** DEMO trades use a placeholder lot of 1 unit; say so wherever quantity is shown. */
+export function SourceBadges({ dataSource, lotSource }) {
   return (
-    <>
-      <ToggleRow title="Preview sample layout" subtitle="Shows labelled sample rows, not your trades" value={value} onValueChange={onChange} />
-      {value ? <NoticeBanner tone="primary" testID="sample-banner">SAMPLE DATA: illustrative rows only. These are not your orders, positions or profits.</NoticeBanner> : null}
-    </>
+    <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+      <Badge label="PAPER" tone="primary" />
+      <Badge label={dataSource} tone={dataSource === 'DEMO' ? 'info' : 'positive'} />
+      {lotSource === 'DEMO_PLACEHOLDER' ? <Badge label="PLACEHOLDER LOT" tone="warning" /> : null}
+    </View>
   );
 }
 
-function OrderCard({ o, sample }) {
+export function OrderCard({ o }) {
   return (
-    <Card>
+    <Card onPress={() => router.push(`/orders/${o.id}`)} accessibilityLabel={`Order ${o.instrument} ${o.status}`} testID={`order-${o.id}`}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <View style={{ flex: 1 }}>
           <AppText variant="bodyStrong">{o.instrument}</AppText>
           <AppText variant="caption" tone="muted">
-            {o.side} {o.quantity} lot · {o.order_type} · {formatIST(o.created_at)} IST
+            {o.side} {o.quantity} qty ({o.lots} lot{o.lots === 1 ? '' : 's'}) · {o.order_type} · {o.purpose === 'EXIT' ? `exit: ${exitLabel(o.exit_reason)}` : 'entry'} · {formatIST(o.created_at, { withDate: true })} IST
           </AppText>
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <Badge label={o.status} tone={ORDER_TONE[o.status]} />
-          {sample ? <Badge label="SAMPLE" tone="primary" /> : null}
-        </View>
+        <Badge label={o.status.replace('_', ' ')} tone={ORDER_TONE[o.status]} />
       </View>
-      {o.avg_fill_price ? <KeyValue label="Avg fill" value={`₹${o.avg_fill_price}`} /> : null}
+      {o.avg_fill_price ? <KeyValue label="Avg fill" value={`₹${fixed(o.avg_fill_price)} × ${o.filled_qty}`} /> : null}
+      {o.reject_reason ? <AppText variant="caption" tone="negative">{o.reject_reason}</AppText> : null}
     </Card>
   );
 }
 
-export function OrdersList() {
+export function OrdersList({ botId }) {
   const [status, setStatus] = useState('PENDING');
-  const [sample, setSample] = useState(false);
-  const q = useOrders(status);
+  const q = useOrders(status, botId);
   return (
     <View style={{ gap: 12 }}>
       <ChipRow
         value={status}
         onChange={setStatus}
+        testIDPrefix="orders"
         options={[
-          { value: 'PENDING', label: 'Pending' },
+          { value: 'PENDING', label: 'Open' },
           { value: 'EXECUTED', label: 'Executed' },
           { value: 'CANCELLED', label: 'Cancelled' },
           { value: 'REJECTED', label: 'Rejected' },
         ]}
       />
-      <SampleToggle value={sample} onChange={setSample} />
-      {sample ? (
-        SAMPLE_ORDERS.filter((o) => o.status === status).map((o) => <OrderCard key={o.id} o={o} sample />)
-      ) : (
-        <QueryState query={q}>
-          {(page) =>
-            page.items.length ? page.items.map((o) => <OrderCard key={o.id} o={o} />) : (
-              <StateView kind="empty" title={`No ${status.toLowerCase()} orders`} message="Paper orders appear here once the execution engine runs (Phase 6)." />
-            )
-          }
-        </QueryState>
-      )}
+      <QueryState query={q}>
+        {(page) =>
+          page.items.length ? (
+            <>
+              {page.items.map((o) => <OrderCard key={o.id} o={o} />)}
+              {page.total > page.items.length ? <AppText variant="caption" tone="faint">Showing latest {page.items.length} of {page.total}.</AppText> : null}
+            </>
+          ) : (
+            <StateView kind="empty" title={`No ${status === 'PENDING' ? 'open' : status.toLowerCase()} orders`} message="Paper orders appear here when you buy from the option chain or a running bot signals." />
+          )
+        }
+      </QueryState>
     </View>
   );
 }
 
-function PositionCard({ p, sample }) {
-  const chg = p.ltp ? ((Number(p.ltp) - Number(p.avg_price)) / Number(p.avg_price)) * 100 : null;
+export function PositionCard({ p }) {
+  const exit = useExitPosition();
+  const [confirm, setConfirm] = useState(false);
+  const open = p.status !== 'CLOSED';
+  const pnl = open ? p.unrealized_pnl : p.realized_net;
+  const pct = open && p.ltp ? ((Number(p.ltp) - Number(p.avg_price)) / Number(p.avg_price)) * 100 : null;
   return (
-    <Card>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <AppText variant="bodyStrong">{p.instrument}</AppText>
-        {sample ? <Badge label="SAMPLE" tone="primary" /> : null}
+    <Card testID={`position-${p.id}`}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <AppText variant="bodyStrong">{p.instrument}</AppText>
+          <SourceBadges dataSource={p.data_source} />
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <PnLText value={pnl} prefix="₹" variant="bodyStrong" />
+          <AppText variant="caption" tone="faint">{open ? 'Unrealised (gross)' : 'Net of charges'}</AppText>
+        </View>
       </View>
-      <KeyValue label="Quantity" value={`${p.quantity} lot`} />
-      <KeyValue label="Avg / LTP" value={`₹${p.avg_price} / ${p.ltp ? `₹${p.ltp}` : '—'}`} />
-      {chg != null ? <KeyValue label="Premium change" value={`${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`} tone={chg >= 0 ? 'positive' : 'negative'} /> : null}
-      <KeyValue label="Stop-loss / Target" value={`${p.stop_loss ?? '—'} / ${p.target ?? '—'}`} />
+      <KeyValue label="Quantity" value={`${open ? p.quantity : p.entry_qty} (${p.lots} lot${p.lots === 1 ? '' : 's'})`} />
+      <KeyValue label={open ? 'Avg / LTP' : 'Entry / Exit'} value={open ? `₹${fixed(p.avg_price)} / ${p.ltp ? `₹${fixed(p.ltp)}` : '—'}` : `₹${fixed(p.avg_price)} / ₹${fixed(p.avg_exit)}`} />
+      {pct != null ? <KeyValue label="Premium change" value={`${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`} tone={pct >= 0 ? 'positive' : 'negative'} /> : null}
+      <KeyValue label="Stop-loss / Target" value={`${p.stop_loss ? `₹${fixed(p.stop_loss)}` : '—'} / ${p.target ? `₹${fixed(p.target)}` : '—'}${p.trailing_pct ? ` · trail ${Number(p.trailing_pct)}%` : ''}`} />
+      {open ? null : (
+        <>
+          <KeyValue label="Gross / Charges" value={`${formatINR(p.realized_gross)} / ${formatINR(p.charges)}`} />
+          <KeyValue label="Exit reason" value={exitLabel(p.exit_reason)} />
+        </>
+      )}
+      <AppText variant="caption" tone="faint">
+        Opened {formatIST(p.opened_at, { withDate: true })} IST{p.closed_at ? ` · closed ${formatIST(p.closed_at, { withDate: true })} IST` : ''}
+        {open && p.ltp_at ? ` · LTP ${formatIST(p.ltp_at)} IST` : ''}
+      </AppText>
+      {p.status === 'CLOSING' ? <NoticeBanner tone="info">Exit order working. It fills at the bid when one is available.</NoticeBanner> : null}
+      {p.status === 'OPEN' ? <Button title="Exit at market" icon="exit-outline" size="sm" variant="danger" onPress={() => setConfirm(true)} testID={`exit-${p.id}`} /> : null}
+      {exit.error ? <AppText tone="negative">{exit.error.message}</AppText> : null}
+      <ConfirmDialog
+        visible={confirm}
+        title="Exit this paper position?"
+        message={`A SELL order for ${p.quantity} qty of ${p.instrument} is sent at market. It fills at the current bid minus slippage, and exit charges apply.`}
+        confirmLabel="Exit"
+        destructive
+        loading={exit.isPending}
+        onCancel={() => setConfirm(false)}
+        onConfirm={() => exit.mutate(p.id, { onSettled: () => setConfirm(false) })}
+      />
     </Card>
   );
 }
 
-export function PositionsList() {
+export function PositionsList({ botId }) {
   const [state, setState] = useState('OPEN');
-  const [sample, setSample] = useState(false);
-  const q = usePositions(state);
+  const q = usePositions(state, botId);
   return (
     <View style={{ gap: 12 }}>
-      <ChipRow value={state} onChange={setState} options={[{ value: 'OPEN', label: 'Open' }, { value: 'CLOSED', label: 'Closed' }]} />
-      <SampleToggle value={sample} onChange={setSample} />
-      {sample ? (
-        (state === 'OPEN' ? SAMPLE_POSITIONS : []).map((p) => <PositionCard key={p.id} p={p} sample />)
-      ) : (
-        <QueryState query={q}>
-          {(page) =>
-            page.items.length ? page.items.map((p) => <PositionCard key={p.id} p={p} />) : (
-              <StateView kind="empty" title={`No ${state.toLowerCase()} positions`} message="Positions are created from confirmed fills once paper execution runs." />
-            )
-          }
-        </QueryState>
-      )}
+      <ChipRow value={state} onChange={setState} testIDPrefix="positions" options={[{ value: 'OPEN', label: 'Open' }, { value: 'CLOSED', label: 'Closed' }]} />
+      <QueryState query={q}>
+        {(page) =>
+          page.items.length ? page.items.map((p) => <PositionCard key={p.id} p={p} />) : (
+            <StateView kind="empty" title={`No ${state.toLowerCase()} positions`} message="Positions are created from confirmed paper fills." />
+          )
+        }
+      </QueryState>
     </View>
   );
 }

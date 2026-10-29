@@ -247,7 +247,7 @@ class ValidationReport(ApiModel):
     bot_id: uuid.UUID
     version: int
     can_activate: bool
-    activation_mode: Literal["SIGNAL_ONLY"] = "SIGNAL_ONLY"
+    activation_mode: Literal["SIGNAL_ONLY", "PAPER"] = "SIGNAL_ONLY"
     can_place_orders: bool = False
     checks: list[ValidationCheck]
 

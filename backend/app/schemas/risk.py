@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -21,6 +22,8 @@ class RiskLimitsOut(ApiModel):
     max_lots_per_trade: int
     re_entry_after_stop_loss: bool
     square_off_time_ist: str
+    exit_on_loss_limit: bool
+    square_off_on_kill_switch: bool
     kill_switch_engaged: bool
     kill_switch_changed_at: datetime | None
 
@@ -35,6 +38,8 @@ class RiskLimitsUpdate(ApiModel):
     max_lots_per_trade: int | None = Field(default=None, ge=1, le=10)
     re_entry_after_stop_loss: bool | None = None
     square_off_time_ist: str | None = None
+    exit_on_loss_limit: bool | None = None
+    square_off_on_kill_switch: bool | None = None
 
     @field_validator("square_off_time_ist")
     @classmethod
@@ -64,6 +69,7 @@ class RiskStatus(ApiModel):
     new_entries_allowed: bool
     block_reasons: list[str]
     disclaimer: str
+    exposure: list[dict[str, Any]] = []
 
 
 class KillSwitchRequest(ApiModel):

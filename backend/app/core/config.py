@@ -6,6 +6,7 @@ development). Secrets are never hard-coded for non-development environments.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache
 from typing import Annotated
@@ -94,6 +95,18 @@ class Settings(BaseSettings):
     # process; the embedded thread is a development convenience only.
     bot_worker_embedded: bool = False
     bot_worker_interval_seconds: float = Field(default=15.0, ge=1, le=300)
+
+    # Paper trading simulator.
+    paper_brokerage_per_order: Decimal = Field(default=Decimal("20"), ge=0, le=100)
+    paper_slippage_ticks: int = Field(default=1, ge=0, le=20)
+    paper_max_spread_pct: float = Field(default=5.0, gt=0, le=50)
+    # 0 = fill the whole quantity at once; N = at most N units per matching pass.
+    paper_max_fill_qty_per_pass: int = Field(default=0, ge=0)
+    # DEMO chains carry no exchange lot size; paper trades on DEMO data use this
+    # clearly labelled placeholder (1 unit per lot), never a guessed exchange value.
+    demo_lot_size: int = Field(default=1, ge=1, le=1)
+    # The DEMO market never closes; set false to exercise session rules on DEMO data.
+    demo_market_always_open: bool = True
 
     # Verification-code delivery: "console" (development only) or "none".
     otp_delivery: str = "console"

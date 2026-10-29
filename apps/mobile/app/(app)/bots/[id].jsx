@@ -6,8 +6,9 @@ import { AppText, Badge, Button, Card, CardHeader, ConfirmDialog, KeyValue, Mode
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { ConfigSummary } from '../../../features/bots/ConfigSummary';
 import { HEALTH, STATUS_TONE, actionsFor, isEditable } from '../../../features/bots/health';
-import { useBot, useBotAction, useBotFeed, useValidateBot } from '../../../features/trading/api';
-import { formatIST } from '../../../services/format';
+import { useBot, useBotAction, useBotFeed, useOrders, usePositions, useValidateBot } from '../../../features/trading/api';
+import { formatINR, formatIST } from '../../../services/format';
+import { OrderCard, PositionCard } from '../../../features/portfolio/Lists';
 
 const ICON = { PASS: ['checkmark-circle', 'positive'], FAIL: ['close-circle', 'negative'], WARN: ['alert-circle', 'warning'] };
 const ACTION = {
@@ -17,7 +18,7 @@ const ACTION = {
   stop: { title: 'Stop', icon: 'stop', variant: 'danger' },
 };
 const CONFIRM = {
-  start: ['Start bot in signal-only mode?', 'The worker will evaluate your entry conditions on every closed candle and record signals. No orders are placed until paper execution and the risk manager ship (Phase 6).'],
+  start: ['Start bot in paper mode?', 'The worker evaluates your entry conditions on every closed candle. Each signal is checked by the global risk manager and, if allowed, becomes a simulated paper order. No real money or broker is involved.'],
   resume: ['Resume bot?', 'Activation checks run again. The bot continues with the configuration version it started with.'],
   pause: ['Pause bot?', 'The worker stops evaluating this bot until you resume it.'],
   stop: ['Stop bot?', 'The current run ends. You can edit the bot and start a new run later.'],
@@ -46,13 +47,18 @@ function ValidationCard({ report }) {
       <CardHeader
         title="Review & validate"
         subtitle={`Version ${report.version}`}
-        right={<Badge label={report.can_activate ? 'READY (SIGNAL-ONLY)' : 'BLOCKED'} tone={report.can_activate ? 'positive' : 'negative'} />}
+        right={<Badge label={report.can_activate ? `READY (${report.activation_mode.replace('_', '-')})` : 'BLOCKED'} tone={report.can_activate ? 'positive' : 'negative'} />}
       />
       <AppText variant="label" tone="muted">NEEDED TO START</AppText>
       {act.map((c) => <CheckRow key={c.key} c={c} />)}
-      <AppText variant="label" tone="muted" style={{ marginTop: 10 }}>NEEDED TO PLACE ORDERS (PHASE 6)</AppText>
+      <AppText variant="label" tone="muted" style={{ marginTop: 10 }}>NEEDED TO PLACE ORDERS</AppText>
       {ord.map((c) => <CheckRow key={c.key} c={c} />)}
-      <Badge label={report.can_place_orders ? 'ORDERS ALLOWED' : 'ORDERS BLOCKED'} tone={report.can_place_orders ? 'positive' : 'warning'} />
+      <Badge
+        label={report.can_place_orders ? (report.activation_mode === 'PAPER' ? 'PAPER ORDERS ALLOWED' : 'ORDERS ALLOWED') : 'ORDERS BLOCKED'}
+        tone={report.can_place_orders ? 'positive' : 'warning'}
+        testID="orders-badge"
+      />
+      <AppText variant="caption" tone="faint">Live orders stay disabled. Every paper entry still passes the global risk manager at the moment it is placed.</AppText>
     </Card>
   );
 }
@@ -79,14 +85,46 @@ function HealthCard({ b }) {
   );
 }
 
+function BotTrades({ id }) {
+  const open = usePositions('OPEN', id);
+  const closed = usePositions('CLOSED', id);
+  const rows = [...(open.data?.items ?? []), ...(closed.data?.items ?? [])];
+  if (open.isLoading || closed.isLoading) return <AppText tone="muted">Loading…</AppText>;
+  if (!rows.length) return <AppText tone="muted">No paper trades yet. Trades appear when a signal passes the risk manager and fills.</AppText>;
+  return rows.map((p) => <PositionCard key={p.id} p={p} />);
+}
+
+function BotOrders({ id }) {
+  const q = useOrders(undefined, id);
+  return (
+    <QueryState query={q} isEmpty={(d) => !d.items.length} emptyMessage="No orders yet. Rejected entries also show here, with the risk manager's reason.">
+      {(page) => page.items.map((o) => <OrderCard key={o.id} o={o} />)}
+    </QueryState>
+  );
+}
+
 function Feed({ id }) {
-  const theme = useTheme();
   const [tab, setTab] = useState('signals');
-  const q = useBotFeed(id, tab);
   return (
     <Card testID="bot-feed">
-      <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'signals', label: 'Signals' }, { value: 'events', label: 'Logs' }, { value: 'runs', label: 'Runs' }]} />
-      <View style={{ marginTop: 10 }}>
+      <SegmentedControl
+        value={tab}
+        onChange={setTab}
+        testID="bot-feed-tabs"
+        options={[{ value: 'signals', label: 'Signals' }, { value: 'trades', label: 'Trades' }, { value: 'orders', label: 'Orders' }, { value: 'events', label: 'Logs' }, { value: 'runs', label: 'Runs' }]}
+      />
+      <View style={{ marginTop: 10, gap: 8 }}>
+        {tab === 'trades' ? <BotTrades id={id} /> : tab === 'orders' ? <BotOrders id={id} /> : <FeedList id={id} tab={tab} />}
+      </View>
+    </Card>
+  );
+}
+
+function FeedList({ id, tab }) {
+  const theme = useTheme();
+  const q = useBotFeed(id, tab);
+  return (
+    <>
         <QueryState query={q} isEmpty={(d) => !d.length} emptyMessage={tab === 'signals' ? 'No signals yet. Signals appear when all entry conditions are met on a closed candle.' : 'Nothing yet.'}>
           {(rows) =>
             rows.map((x) =>
@@ -115,8 +153,7 @@ function Feed({ id }) {
             )
           }
         </QueryState>
-      </View>
-    </Card>
+    </>
   );
 }
 
@@ -174,7 +211,7 @@ export default function BotDetail() {
               </AppText>
 
               <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                <StatTile label="Today P&L" value={b.today_pnl ?? '—'} sub="Paper fills start in Phase 6" />
+                <StatTile label="Today P&L" value={b.today_pnl == null ? '—' : formatINR(b.today_pnl)} tone={Number(b.today_pnl) > 0 ? 'positive' : Number(b.today_pnl) < 0 ? 'negative' : 'default'} sub={b.today_pnl == null ? 'No paper trades today' : 'Paper, net of charges'} />
                 <StatTile label="Signals today" value={b.signals_today} sub={b.last_signal ?? 'No signals yet'} />
               </View>
 

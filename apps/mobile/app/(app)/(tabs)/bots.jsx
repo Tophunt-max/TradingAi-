@@ -37,7 +37,7 @@ export default function Bots() {
         }}
       </QueryState>
       <NoticeBanner tone="info">
-        Status and health come from the backend worker. Running bots are signal-only: they record entry signals on each closed candle but place no orders until paper execution and the risk manager ship (Phase 6).
+        Status and health come from the backend worker. Running bots evaluate each closed candle; every signal goes through the global risk manager and, if allowed, becomes a simulated paper order. Live trading is disabled.
       </NoticeBanner>
     </Screen>
   );

@@ -99,6 +99,9 @@ class RiskSettings(TimestampMixin, Base):
     max_lots_per_trade: Mapped[int] = mapped_column(default=1)
     re_entry_after_stop_loss: Mapped[bool] = mapped_column(default=False)
     square_off_time_ist: Mapped[str] = mapped_column(String(5), default="15:15")
+    # Position policies when a limit trips (see docs/risk.md).
+    exit_on_loss_limit: Mapped[bool] = mapped_column(default=True)
+    square_off_on_kill_switch: Mapped[bool] = mapped_column(default=True)
     kill_switch_engaged: Mapped[bool] = mapped_column(default=False)
     kill_switch_changed_at: Mapped[datetime | None]
 

@@ -18,6 +18,8 @@ const TITLES = {
   'bots/templates': 'Strategy Templates',
   'bots/[id]': 'Bot Details',
   orders: 'Orders',
+  'orders/[id]': 'Order Details',
+  charges: 'Charges Calculator',
   positions: 'Positions',
   'risk-center': 'Risk Management',
   alerts: 'Notifications',

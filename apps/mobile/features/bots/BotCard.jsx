@@ -3,14 +3,13 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { AppText, Badge, Card, ModeBadge } from '../../components/ui';
-import { formatIST } from '../../services/format';
+import { formatINR, formatIST } from '../../services/format';
 import { HEALTH, STATUS_TONE } from './health';
 
 const METHOD_LABEL = { AI: 'AI GENERATED', MANUAL: 'MANUAL', TEMPLATE: 'TEMPLATE', CLONE: 'CLONE' };
 
 export function BotCard({ bot }) {
   const theme = useTheme();
-  const dash = (v) => (v == null ? '—' : v);
   const health = HEALTH[bot.health] ?? HEALTH.NOT_RUNNING;
   return (
     <Card testID={`bot-${bot.id}`} onPress={() => router.push(`/bots/${bot.id}`)} accessibilityLabel={`${bot.name}, ${bot.status}`}>
@@ -26,14 +25,14 @@ export function BotCard({ bot }) {
           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
             <Badge label={bot.status} tone={STATUS_TONE[bot.status]} />
             <ModeBadge live={bot.mode === 'LIVE'} />
-            {bot.status === 'ACTIVE' ? <Badge label="SIGNAL-ONLY" tone="info" /> : null}
+            {bot.status === 'ACTIVE' && bot.run?.mode === 'SIGNAL_ONLY' ? <Badge label="SIGNAL-ONLY" tone="info" /> : null}
             <Badge label={METHOD_LABEL[bot.creation_method]} tone={bot.creation_method === 'AI' ? 'info' : 'neutral'} />
           </View>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.colors.textFaint} />
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-        <Metric label="Today P&L" value={dash(bot.today_pnl)} />
+        <Metric label="Today P&L" value={bot.today_pnl == null ? '—' : formatINR(bot.today_pnl)} tone={Number(bot.today_pnl) > 0 ? 'positive' : Number(bot.today_pnl) < 0 ? 'negative' : undefined} />
         <Metric label="Signals today" value={bot.signals_today} />
         <Metric label="Trades" value={bot.trade_count} />
         <Metric label="Health" value={health.label} tone={health.tone} />

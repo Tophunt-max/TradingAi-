@@ -80,6 +80,25 @@ def _health(bot: Bot, run: BotRun | None, kill_switch: bool) -> tuple[str, str |
     return "OK", f"Evaluating each closed candle; last candle {last}."
 
 
+def _today_pnl(db: Session, bot_id: uuid.UUID) -> Decimal | None:
+    """Paper net P&L for today (IST): realised net of closed trades plus open mark-to-market.
+    None when the bot has no trades today, so the UI shows a dash instead of a fake zero."""
+    from app.models.execution import Position
+
+    day0 = datetime.combine(utcnow().astimezone(IST).date(), time(0), IST)
+    rows = db.scalars(select(Position).where(
+        Position.bot_id == bot_id,
+        (Position.status != "CLOSED") | (Position.closed_at >= day0))).all()
+    if not rows:
+        return None
+    total = Decimal("0")
+    for p in rows:
+        total += p.realized_net
+        if p.status != "CLOSED" and p.last_price is not None:
+            total += (p.last_price - p.avg_entry) * p.quantity
+    return total.quantize(Decimal("0.01"))
+
+
 def to_out(bot: Bot, db: Session | None = None) -> BotOut:
     out = BotOut(
         id=bot.id, name=bot.name, strategy_id=bot.strategy_id,
@@ -96,6 +115,11 @@ def to_out(bot: Bot, db: Session | None = None) -> BotOut:
     out.health, out.health_detail = _health(bot, run if run and run.status != "ENDED" else None,
                                             bool(rs and rs.kill_switch_engaged))
     out.run = BotRunOut.model_validate(run) if run else None
+    out.today_pnl = _today_pnl(db, bot.id)
+    from app.models.execution import Position
+
+    out.trade_count = db.scalar(select(func.count()).select_from(Position)
+                                .where(Position.bot_id == bot.id)) or 0
     last = db.scalar(select(BotSignal).where(BotSignal.bot_id == bot.id)
                      .order_by(BotSignal.bar_ts.desc()).limit(1))
     if last:
@@ -195,7 +219,8 @@ def market_context(db: Session, settings: Settings, cfg: BotConfig) -> MarketCon
 
 
 def validate(
-    bot: Bot, cfg: BotConfig, rs: RiskSettings, market: MarketContext | None = None
+    bot: Bot, cfg: BotConfig, rs: RiskSettings, market: MarketContext | None = None,
+    paper_enabled: bool = True,
 ) -> ValidationReport:
     market = market or MarketContext(mode="DEMO")
     checks: list[ValidationCheck] = []
@@ -236,17 +261,17 @@ def validate(
             "No current contract found in the instrument master. Run an instrument sync.",
             "ORDERS")
     else:
-        add("contract", "Contract, lot and tick size", False,
-            "DEMO mode has no instrument master, so lot size, tick size and expiry cannot be "
-            "verified.", "ORDERS")
+        add("contract", "Contract, lot and tick size", None,
+            "DEMO mode has no instrument master: paper orders use a labelled placeholder "
+            "of 1 unit per lot, not exchange metadata.", "ORDERS")
     if market.mode == "INDSTOCKS":
         add("data", "Market data", market.provider_ok,
             "INDstocks data is available." if market.provider_ok
             else f"INDstocks is not usable: {market.provider_detail}.", "ORDERS")
     else:
-        add("data", "Market data", False,
-            "Only synthetic DEMO data is available. Trading decisions need a live, authorised "
-            "feed. Signals on DEMO data are for testing only.", "ORDERS")
+        add("data", "Market data", None,
+            "Only synthetic DEMO data is available. Paper trades on DEMO data are for "
+            "testing the app only.", "ORDERS")
     add("capital", "Capital allocation", cfg.risk.capital_allocation <= rs.capital,
         f"{inr(cfg.risk.capital_allocation)} of {inr(rs.capital)} global capital."
         if cfg.risk.capital_allocation <= rs.capital
@@ -277,15 +302,18 @@ def validate(
         "Engaged: new entries are blocked." if rs.kill_switch_engaged else "Not engaged.")
     add("broker", "Broker permissions", None,
         "Paper mode only; no broker is required. Live trading is locked.", "ORDERS")
-    add("engine", "Execution engine", False,
-        "The paper execution engine and global risk manager arrive in Phase 6. Until then the "
-        "bot runs in signal-only mode and places no orders.", "ORDERS")
+    add("engine", "Execution engine", paper_enabled,
+        "Paper execution with the global risk manager: every entry is re-checked against your "
+        "shared limits before a simulated order is sent." if paper_enabled else
+        "Paper trading is disabled, so the bot runs signal-only.", "ORDERS")
+    add("live", "Live trading", None,
+        "Locked: no verified broker order adapter (Phase 8).", "ORDERS")
 
     activation = [c for c in checks if c.required_for == "ACTIVATION"]
     return ValidationReport(
         bot_id=bot.id, version=bot.current_version,
         can_activate=all(c.status != "FAIL" for c in activation),
-        activation_mode="SIGNAL_ONLY",
+        activation_mode="PAPER" if paper_enabled else "SIGNAL_ONLY",
         can_place_orders=all(c.status != "FAIL" for c in checks),
         checks=checks,
     )

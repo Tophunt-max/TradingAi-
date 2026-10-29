@@ -1,8 +1,9 @@
 # Analysis engine (Phase 4)
 
 `GET /api/v1/analysis/{symbol}?timeframe=5m|15m|1h|1d` runs a 12-step pipeline on the last 300
-**closed** candles and always returns `decision: NO_TRADE` until costs and the risk manager
-exist (Phase 6).
+**closed** candles and always returns `decision: NO_TRADE`. The analysis view does not place or
+price trades; paper orders come from bots and manual buys and go through the risk manager
+([risk.md](risk.md)).
 
 | # | Step | Module | Status |
 |---|---|---|---|
@@ -14,8 +15,8 @@ exist (Phase 6).
 | 6 | Strategy evaluation | `strategies/rules.py` | Done |
 | 7 | AI prediction | `ai/model.py`, `ai/registry.py` | Done (needs a promoted model) |
 | 8 | Contract selection | `analysis/options_select.py` | Done |
-| 9 | Cost estimation | — | **Blocked: Phase 6** |
-| 10 | Independent risk validation | — | **Blocked: Phase 6** |
+| 9 | Cost estimation | — | Not in the analysis view yet; charges are computed at order time by paper execution ([risk.md](risk.md)) |
+| 10 | Independent risk validation | — | Not in the analysis view yet; every paper order passes the global risk manager ([risk.md](risk.md)) |
 | 11 | Proposal or NO TRADE | `analysis/pipeline.py` | Always NO TRADE |
 | 12 | Explanation | `analysis/pipeline.py` | Done |
 

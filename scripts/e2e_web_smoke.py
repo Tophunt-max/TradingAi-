@@ -136,6 +136,26 @@ def main() -> int:
             else:
                 expect(page.get_by_test_id("chain-metadata-note")).to_contain_text("Lot size")
             shot("03-option-chain")
+            # Paper buy from the strike sheet. DEMO fills with a labelled placeholder lot;
+            # live-shaped data (lot 75, ATM premium ~₹167) needs more than the default
+            # ₹10,000 capital / ₹250 risk per trade, so the risk manager must reject it.
+            page.get_by_role("button", name=re.compile(r"^Strike .* ATM details$")).click()
+            expect(page.get_by_test_id("paper-buy")).to_be_visible(timeout=10_000)
+            page.get_by_test_id("paper-submit").click()
+            status = page.get_by_test_id("paper-result-status")
+            if args.live_fake:
+                expect(status).to_contain_text("REJECTED", timeout=10_000)
+                print("PAPER RESULT:", page.get_by_test_id("paper-result").inner_text())
+            else:
+                expect(status).to_contain_text("FILLED", timeout=10_000)
+            shot("03b-paper-buy")
+            page.get_by_test_id("paper-view-order").click()
+            expect(page.get_by_test_id("order-detail")).to_be_visible(timeout=10_000)
+            expect(page.get_by_text("Order timeline")).to_be_visible()
+            if not args.live_fake:
+                expect(page.get_by_test_id("order-detail")).to_contain_text("PLACEHOLDER LOT")
+            shot("03c-order-detail")
+            page.go_back()
             page.go_back()
 
             # Markets -> chart.
@@ -175,8 +195,8 @@ def main() -> int:
             shot("07-ai-create-review")
             page.get_by_test_id("ai-save").click()
             expect(page.get_by_test_id("validation-report")).to_contain_text(
-                "READY (SIGNAL-ONLY)", timeout=10_000)
-            expect(page.get_by_test_id("validation-report")).to_contain_text("ORDERS BLOCKED")
+                "READY (PAPER)", timeout=10_000)
+            expect(page.get_by_test_id("orders-badge")).to_be_visible()
             page.get_by_test_id("bot-start").click()
             page.get_by_role("alert").get_by_role("button", name="Start").click()
             expect(page.get_by_test_id("bot-status")).to_contain_text("ACTIVE", timeout=10_000)
@@ -202,12 +222,38 @@ def main() -> int:
             page.get_by_role("tab", name="Portfolio").click()
             expect(page.get_by_test_id("portfolio-summary")).to_be_visible(timeout=10_000)
             shot("10-portfolio")
+            if not args.live_fake:
+                # The manual DEMO position is open; exit it at market.
+                exit_btn = page.locator('[data-testid^="exit-"]').first
+                expect(exit_btn).to_be_visible(timeout=10_000)
+                exit_btn.click()
+                page.get_by_role("alert").get_by_role("button", name="Exit").click()
+                expect(page.get_by_role("alert")).to_have_count(0, timeout=10_000)
+            page.get_by_test_id("portfolio-tabs").get_by_text("Positions").click()
+            page.get_by_test_id("positions-CLOSED").click()
+            if not args.live_fake:
+                expect(page.get_by_text("Manual exit").first).to_be_visible(timeout=10_000)
+            shot("10b-positions-closed")
+            page.get_by_test_id("portfolio-tabs").get_by_text("Orders").click()
+            page.get_by_test_id("orders-EXECUTED" if not args.live_fake
+                                else "orders-REJECTED").click()
+            expect(page.locator('[data-testid^="order-"]').first).to_be_visible(timeout=10_000)
+            shot("10c-orders")
+            page.get_by_test_id("portfolio-tabs").get_by_text("Summary").click()
+            page.get_by_test_id("open-charges").click()
+            page.get_by_test_id("charges-qty").fill("75")
+            page.get_by_test_id("charges-calc").click()
+            expect(page.get_by_test_id("charges-result")).to_contain_text("STT 0.15%",
+                                                                          timeout=10_000)
+            shot("10d-charges")
+            page.go_back()
             page.get_by_role("button", name="Risk Center").click()
             page.get_by_test_id("kill-switch").click()
             page.get_by_role("alert").get_by_role("button", name="Engage").click()
             expect(page.get_by_role("button", name="Release kill switch")).to_be_visible(
                 timeout=10_000)
             expect(page.get_by_role("alert")).to_have_count(0, timeout=5_000)
+            expect(page.get_by_test_id("exposure")).to_be_visible()
             shot("11-risk-center")
             page.go_back()
 

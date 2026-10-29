@@ -6,7 +6,7 @@ DRAFT / STOPPED --start--> ACTIVE --pause--> PAUSED --resume--> ACTIVE
 ACTIVE / PAUSED --stop--> STOPPED
 ```
 - **Safe transitions:** each transition is a compare-and-set update on the `bots` row. A double tap or a race with the worker returns `409 INVALID_BOT_STATE` and never leaves the bot in a wrong state.
-- **Activation checks:** `start` and `resume` re-run validation. Checks are tagged `ACTIVATION` (needed to start) or `ORDERS` (needed to place orders: contract, live data, broker, execution engine). `can_place_orders` stays `false` until Phase 6.
+- **Activation checks:** `start` and `resume` re-run validation. Checks are tagged `ACTIVATION` (needed to start) or `ORDERS` (needed to place orders: contract, live data, broker, execution engine). Since Phase 6, `activation_mode` is `PAPER` when paper trading is enabled and `can_place_orders` is `true` when no `ORDERS` check fails (contract/data checks are WARN on DEMO). Each signal then becomes a paper entry (`client_order_id = SIG-{signal id}`) that must pass the global risk manager.
 - **Runs:** each start creates a **run** pinned to the current config version. Editing or deleting needs the bot to be STOPPED or DRAFT.
 - **Kill switch:** while it is engaged, starting a bot is blocked and running bots suppress every signal.
 

@@ -13,15 +13,24 @@ describe('bot lifecycle UI', () => {
     expect(isEditable('STOPPED')).toBe(true);
   });
 
+  const bot = {
+    id: 'b1', name: 'Nifty Momentum', underlying: 'NIFTY', strategy_name: 'Momentum', timeframe: '5m',
+    status: 'ACTIVE', mode: 'PAPER', creation_method: 'AI', today_pnl: null, signals_today: 1, trade_count: 0,
+    health: 'OK', health_detail: 'Evaluating', last_signal: 'CE at 24001.00', last_signal_at: '2026-10-28T05:00:00Z',
+    run: { mode: 'SIGNAL_ONLY' },
+  };
+
   it('shows backend health and signal-only mode on the card', async () => {
-    const bot = {
-      id: 'b1', name: 'Nifty Momentum', underlying: 'NIFTY', strategy_name: 'Momentum', timeframe: '5m',
-      status: 'ACTIVE', mode: 'PAPER', creation_method: 'AI', today_pnl: null, signals_today: 1, trade_count: 0,
-      health: 'OK', health_detail: 'Evaluating', last_signal: 'CE at 24001.00', last_signal_at: '2026-10-28T05:00:00Z',
-    };
     await render(<ThemeProvider><BotCard bot={bot} /></ThemeProvider>);
     expect(screen.getByText('HEALTHY')).toBeTruthy();
     expect(screen.getByText('SIGNAL-ONLY')).toBeTruthy();
     expect(screen.getByText(/Last signal CE at 24001.00/)).toBeTruthy();
+  });
+
+  it('shows real paper P&L and no signal-only badge for a paper run', async () => {
+    await render(<ThemeProvider><BotCard bot={{ ...bot, run: { mode: 'PAPER' }, today_pnl: '-125.40', trade_count: 2 }} /></ThemeProvider>);
+    expect(screen.queryByText('SIGNAL-ONLY')).toBeNull();
+    expect(screen.getByText('₹-125.40')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
   });
 });

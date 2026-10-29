@@ -10,7 +10,29 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 > not live profits and do not guarantee future returns. **Live trading is disabled in
 > this build.**
 
-## Current status: Phase 5 (bot system) complete
+## Current status: Phase 6 (risk manager + paper execution) complete
+
+Paper trading now works end to end. Every entry, from any bot or a manual buy on the option
+chain, passes one **global risk manager** (kill switch, daily loss stop, profit lock, entries
+per day, open positions, lots, planned risk incl. charges, funds, session, data quality,
+unresolved orders). Allowed entries become orders with a full state machine and are filled by
+a **PaperBroker** at bid/ask with slippage. Charges use versioned NSE/SEBI/GST schedules
+(STT 0.15% on option sells from 1 Apr 2026). The execution worker manages stop-loss, target,
+trailing stop, square-off and the daily loss stop, and recovers after restarts. The kill switch
+cancels pending entries and (by policy) squares off positions. See [docs/risk.md](docs/risk.md).
+
+What is real vs. simulated in Phase 6:
+
+| Item | State |
+|---|---|
+| Risk checks, order states, positions, daily counters, P&L arithmetic | Real logic, stored in the database, tested on SQLite and PostgreSQL |
+| Fills | **Simulated** (PaperBroker): bid/ask + slippage, never a real exchange |
+| Charges | Estimates from published rates; brokerage default ₹20/order (configurable). IPFT and STT on exercise not modelled |
+| Prices on DEMO | Synthetic, labelled `DEMO`; lot size is a labelled placeholder of 1 unit |
+| Prices on INDstocks | Real-shaped, but still not verified with a real token |
+| Live trading | Disabled. No broker adapter exists (Phase 8) |
+
+## Phase 5 (bot system)
 
 Bots can now be started, paused, resumed and stopped for real. A persistent, horizontally scalable
 worker evaluates each running bot's configured entry conditions on every closed candle. It records
@@ -30,7 +52,7 @@ Phase 4 adds the analysis pipeline:
 
 Patterns are only reported once confirmed and never repaint. **Probabilities are shown only from a promoted model**, and a
 model can be promoted only if it beats a base-rate baseline out of sample, is calibrated and was trained on
-real data. The decision stays **NO TRADE** until charges and the risk manager exist (Phase 6). Details are in
+real data. The analysis decision stays **NO TRADE** while no model is promoted; paper trades come from bots and manual buys through the risk manager (Phase 6). Details are in
 [docs/analysis.md](docs/analysis.md).
 
 ## Phase 3 (market data): not yet verified with a real INDstocks token
@@ -59,7 +81,7 @@ Screenshots from the automated browser test are in [docs/screenshots](docs/scree
 What is real vs. placeholder in Phase 2:
 - **Real and saved in the database:** bot configurations (versioned), global risk limits, the kill switch, and alerts (built from your audit trail).
 - **Synthetic, labelled `DEMO`:** quotes, candles, option chain and the inputs to the analysis.
-- **Empty until Phase 6:** orders, positions and P&L. A "Preview sample layout" toggle shows labelled sample rows.
+- **Filled since Phase 6:** orders, positions and P&L come from the paper ledger. The Phase 2 sample-layout toggle has been removed.
 - **Not shown on purpose:** AI probabilities (no calibrated model yet) and lot sizes (no instrument master yet).
 - **Not built:** Google/Apple sign-in from the mockup, and the Backtesting Lab and Model Lab screens (Phase 7).
 
@@ -74,7 +96,8 @@ What is real vs. placeholder in Phase 2:
 | Demo market data, labelled `DEMO` everywhere | ✅ |
 | Phase 2 screens + APIs (charts, option chain, analysis, bots, risk, portfolio, alerts, brokers) | ✅ |
 | Causal indicators (EMA, RSI, MACD, Bollinger, ATR, confirmed pivots) and Black-Scholes Greeks | ✅ |
-| Market data, analysis engine, bots, risk manager, paper execution, backtesting, broker integration | ❌ Not built (Phases 3–9) |
+| Market data (3), analysis engine (4), bots (5), risk manager + paper execution (6) | ✅ |
+| Backtesting (7), broker integration (8), hardening/deployment (9) | ❌ Not built |
 
 Screens for unbuilt modules show "Not built yet · Phase N" and no numbers.
 
@@ -127,7 +150,7 @@ python scripts/e2e_web_smoke.py --dist apps/mobile/dist      # browser E2E (need
 | 3 ✅ | Authorised market-data provider (INDstocks), instrument master, candles, live updates, option chain, data-quality validation |
 | 4 ✅ | Indicators, candlestick patterns, SMC, regime detection, strategy router, baseline AI predictions, explanations |
 | 5 ✅ | Bot system: AI Auto Create, manual builder, templates, validation, lifecycle, persistent workers |
-| 6 | Global risk manager, order state machine, simulated fills, charges, restart recovery, kill switch |
+| 6 ✅ | Global risk manager, order state machine, simulated fills, charges, restart recovery, kill switch |
 | 7 | Backtesting (walk-forward, no lookahead), model registry, drift detection, reports |
 | 8 | Verified broker adapter. Live trading stays locked until every test passes and the user explicitly authorises it |
 | 9 | Security review, load testing, monitoring, backups, staging, deployment docs |
@@ -165,15 +188,26 @@ Yeh integration abhi asli INDstocks token ke saath test nahi hua hai.
 **Phase 4 mein kya aaya:** naye indicators (VWAP, Supertrend, ADX, Stochastic, pivots, Fibonacci), candlestick
 aur chart patterns, Smart Money Concepts, market regime, strategy router aur AI model lab. AI probability tabhi
 dikhegi jab model asli data par baseline se behtar aur calibrated sabit ho, aur admin use promote kare.
-Decision abhi bhi NO TRADE rehta hai, kyunki charges aur risk manager Phase 6 mein aayenge.
+AI Analysis screen ka decision abhi bhi NO TRADE rehta hai (koi promoted model nahi hai); paper trades bots ya manual buy se hote hain.
 
 **Phase 5 mein kya aaya:** bots ab sach mein Start/Pause/Resume/Stop hote hain. Ek background worker har band
 candle par bot ki entry conditions check karta hai aur signal record karta hai, lekin **koi order nahi lagata**
 (orders Phase 6 mein aayenge). Cooldown, session time aur saare bots ke liye ek global daily limit lagte hain.
 Worker chalane ke liye: `python -m app.workers.bot_runner`.
 
-**Abhi kya baaki hai:** Real market data, AI analysis, bots, risk manager, paper
-execution, backtesting aur broker integration. Ye sab agle phases mein banenge. Jo screen
+**Phase 6 mein kya aaya:** ab paper trading poori chalti hai. Har entry (bot ka signal ho ya option chain
+se manual "Paper buy") pehle ek **global risk manager** se guzarti hai: kill switch, daily loss stop,
+profit lock, din ki entries, open positions, lots, charges ke saath planned risk, funds, market time aur
+data quality. Pass hone par order banta hai aur **PaperBroker** use ask/bid par slippage ke saath fill karta
+hai (yeh simulation hai, asli exchange nahi). Charges NSE/SEBI/GST ke published rates se lagte hain
+(1 April 2026 se option sell par STT 0.15%). Worker stop-loss, target, trailing stop aur square-off
+khud manage karta hai, aur restart ke baad bhi wahi state se chalta hai. Kill switch pending orders cancel
+karta hai aur (setting ke hisaab se) positions square off karta hai. DEMO data par lot size asli nahi hai:
+1 lot = 1 unit ka placeholder hai, aur app mein "PLACEHOLDER LOT" likha aata hai.
+Paper P&L asli profit nahi hai. Live trading abhi bhi band hai. Details: `docs/risk.md`.
+
+**Abhi kya baaki hai:** asli INDstocks token ke saath verification, backtesting aur model learning
+(Phase 7), verified broker adapter (Phase 8), aur security/load testing/deployment (Phase 9). Jo screen
 ready nahi hai, us par "Not built yet · Phase N" likha aata hai.
 
 **Kaise chalayein:**

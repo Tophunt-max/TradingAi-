@@ -121,9 +121,10 @@ def test_validation_uses_global_limits_and_blocks_activation(client, h):
                       json={"creation_method": "MANUAL", "config": cfg}).json()
     report = client.post(f"/api/v1/bots/{bot['id']}/validate", headers=h).json()
     checks = {c["key"]: c["status"] for c in report["checks"]}
-    assert report["can_activate"] is False and report["can_place_orders"] is False
+    assert report["can_activate"] is False
     assert checks["entries"] == "FAIL" and checks["risk_per_trade"] == "FAIL"
-    assert checks["contract"] == "FAIL" and checks["engine"] == "FAIL" and checks["data"] == "FAIL"
+    # DEMO: paper orders use a labelled placeholder contract, so these are warnings.
+    assert checks["contract"] == "WARN" and checks["data"] == "WARN" and checks["engine"] == "PASS"
 
     r = client.post(f"/api/v1/bots/{bot['id']}/start", headers=h)
     assert r.status_code == 409 and r.json()["error"]["code"] == "VALIDATION_FAILED"
@@ -168,7 +169,7 @@ def test_risk_defaults_update_and_kill_switch_persist(client, h):
         10000, 250, 800, 1200)
     assert lim["max_entries_per_day"] == 2 and lim["max_open_positions"] == 1
     assert lim["re_entry_after_stop_loss"] is False
-    assert r["engine_active"] is False and r["new_entries_allowed"] is False
+    assert r["engine_active"] is True and r["new_entries_allowed"] is True
 
     bad = client.patch("/api/v1/risk/limits", headers=h, json={"max_risk_per_trade": "900"})
     assert bad.status_code == 422
@@ -190,7 +191,7 @@ def test_risk_defaults_update_and_kill_switch_persist(client, h):
 
 def test_portfolio_orders_positions_are_empty_not_fabricated(client, h):
     p = client.get("/api/v1/portfolio", headers=h).json()
-    assert p["mode"] == "PAPER" and p["engine_active"] is False
+    assert p["mode"] == "PAPER" and p["engine_active"] is True
     assert float(p["total_net_pnl"]) == 0 and float(p["available_funds"]) == 10000
     assert client.get("/api/v1/orders?status=PENDING", headers=h).json()["total"] == 0
     assert client.get("/api/v1/positions", headers=h).json()["items"] == []

@@ -20,6 +20,16 @@ from app.models.bots import (
     TradingMode,
     WorkerHeartbeat,
 )
+from app.models.execution import (
+    DailyRiskState,
+    Fill,
+    Order,
+    OrderEvent,
+    PaperBrokerFill,
+    PaperBrokerOrder,
+    Position,
+    WorkerLease,
+)
 from app.models.instruments import Instrument, InstrumentSync
 from app.models.ml import ModelVersion, Prediction
 from app.models.user import User, UserPreferences, UserRole
@@ -28,7 +38,15 @@ __all__ = [
     "AuditLog",
     "ModelVersion",
     "Prediction",
+    "DailyRiskState",
+    "Fill",
     "Instrument",
+    "Order",
+    "OrderEvent",
+    "PaperBrokerFill",
+    "PaperBrokerOrder",
+    "Position",
+    "WorkerLease",
     "InstrumentSync",
     "Bot",
     "BotConfigVersion",

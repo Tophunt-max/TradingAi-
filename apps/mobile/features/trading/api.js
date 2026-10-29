@@ -67,7 +67,7 @@ export function useValidateBot() {
 
 // ---- Risk -----------------------------------------------------------------
 export function useRisk() {
-  return useQuery({ queryKey: ['risk'], queryFn: () => api.get('/api/v1/risk') });
+  return useQuery({ queryKey: ['risk'], queryFn: () => api.get('/api/v1/risk'), refetchInterval: 10_000 });
 }
 
 export function useUpdateRiskLimits() {
@@ -85,24 +85,75 @@ export function useKillSwitch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (engaged) => api.post('/api/v1/risk/kill-switch', { engaged, confirm: true }),
-    onSuccess: (status) => {
-      qc.setQueryData(['risk'], status);
-      qc.invalidateQueries({ queryKey: ['alerts'] });
-    },
+    onSuccess: (status) => qc.setQueryData(['risk'], status),
+    onSettled: () => invalidateTrading(qc),
   });
 }
 
-// ---- Portfolio ------------------------------------------------------------
+// ---- Portfolio & paper execution -------------------------------------------
+// Paper positions are marked to market by the execution worker every few seconds.
+const LIVE_REFRESH = 5_000;
+
+function qs(params) {
+  const p = Object.entries(params).filter(([, v]) => v != null && v !== '');
+  return p.length ? `?${p.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')}` : '';
+}
+
 export function usePortfolio() {
-  return useQuery({ queryKey: ['portfolio'], queryFn: () => api.get('/api/v1/portfolio') });
+  return useQuery({ queryKey: ['portfolio'], queryFn: () => api.get('/api/v1/portfolio'), refetchInterval: LIVE_REFRESH });
 }
 
-export function useOrders(status) {
-  return useQuery({ queryKey: ['orders', status], queryFn: () => api.get(`/api/v1/orders${status ? `?status=${status}` : ''}`) });
+export function useOrders(status, botId) {
+  return useQuery({
+    queryKey: ['orders', status ?? 'ALL', botId ?? null],
+    queryFn: () => api.get(`/api/v1/orders${qs({ status, bot_id: botId })}`),
+    refetchInterval: status === 'PENDING' ? LIVE_REFRESH : 15_000,
+  });
 }
 
-export function usePositions(state = 'OPEN') {
-  return useQuery({ queryKey: ['positions', state], queryFn: () => api.get(`/api/v1/positions?state=${state}`) });
+export function useOrder(id) {
+  return useQuery({
+    queryKey: ['order', id],
+    queryFn: () => api.get(`/api/v1/orders/${id}`),
+    enabled: !!id,
+    refetchInterval: (q) => (q.state.data && ['FILLED', 'REJECTED', 'CANCELLED'].includes(q.state.data.status) ? false : LIVE_REFRESH),
+  });
+}
+
+export function usePositions(state = 'OPEN', botId) {
+  return useQuery({
+    queryKey: ['positions', state, botId ?? null],
+    queryFn: () => api.get(`/api/v1/positions${qs({ state, bot_id: botId })}`),
+    refetchInterval: state === 'OPEN' ? LIVE_REFRESH : 30_000,
+  });
+}
+
+function invalidateTrading(qc) {
+  ['portfolio', 'orders', 'order', 'positions', 'risk', 'alerts', 'bots', 'bot'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+}
+
+/** Manual paper BUY. The idempotency key makes a retried tap return the same order. */
+export function usePaperEntry() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (body) => api.post('/api/v1/orders/paper', body), onSettled: () => invalidateTrading(qc) });
+}
+
+export function useCancelOrder() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id) => api.post(`/api/v1/orders/${id}/cancel`), onSettled: () => invalidateTrading(qc) });
+}
+
+export function useExitPosition() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id) => api.post(`/api/v1/positions/${id}/exit`), onSettled: () => invalidateTrading(qc) });
+}
+
+export function useChargesEstimate() {
+  return useMutation({ mutationFn: (body) => api.post('/api/v1/charges/estimate', body) });
+}
+
+export function newIdempotencyKey() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 // ---- Alerts & brokers -----------------------------------------------------

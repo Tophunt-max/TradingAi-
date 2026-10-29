@@ -39,11 +39,11 @@ export default function Alerts() {
               ))}
             </Card>
           ) : (
-            <StateView kind="empty" title="No notifications" message={cat === 'TRADES' ? 'Trade alerts start with paper execution (Phase 6).' : undefined} />
+            <StateView kind="empty" title="No notifications" message={cat === 'TRADES' ? 'Paper fills, rejections and exits appear here.' : undefined} />
           )
         }
       </QueryState>
-      <NoticeBanner tone="info">Push and Telegram delivery, signal alerts and daily reports are added with the alert engine (Phase 5).</NoticeBanner>
+      <NoticeBanner tone="info">Alerts are in-app only. Push and Telegram delivery and daily reports are not built yet.</NoticeBanner>
     </Screen>
   );
 }

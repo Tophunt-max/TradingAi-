@@ -1,4 +1,4 @@
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
@@ -34,7 +34,9 @@ export function BottomSheet({ visible, onClose, title, children, testID }) {
         >
           <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border }} />
           {title ? <AppText variant="heading" accessibilityRole="header">{title}</AppText> : null}
-          {children}
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: theme.spacing.md }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {children}
+          </ScrollView>
         </Animated.View>
       </Animated.View>
     </Modal>

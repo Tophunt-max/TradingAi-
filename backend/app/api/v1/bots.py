@@ -138,7 +138,8 @@ def _report(db: DbDep, settings: SettingsDep, bot: Bot) -> ValidationReport:
     rs = risk_svc.get_or_create(db, bot.user_id)
     db.commit()
     cfg = svc.current_config(bot)
-    return svc.validate(bot, cfg, rs, svc.market_context(db, settings, cfg))
+    return svc.validate(bot, cfg, rs, svc.market_context(db, settings, cfg),
+                        paper_enabled=settings.paper_trading_enabled)
 
 
 @router.post("/{bot_id}/validate", response_model=ValidationReport)
@@ -167,7 +168,9 @@ def _lifecycle(action: str):  # type: ignore[no-untyped-def]
                 raise AppError("The bot did not pass activation checks: " + ", ".join(failed)
                                + ".", code="VALIDATION_FAILED", status_code=409,
                                details=report.model_dump(mode="json"))
-        lifecycle.transition(db, bot, action, _REASONS[action])
+        mode = "PAPER" if settings.paper_trading_enabled else "SIGNAL_ONLY"
+        lifecycle.transition(db, bot, action, _REASONS[action].replace(
+            "signal-only", "paper" if mode == "PAPER" else "signal-only"), mode=mode)
         record_audit(db, action=f"bot.{action}", user_id=ctx.user.id, request=request,
                      entity_type="bot", entity_id=str(bot.id), details={"name": bot.name})
         db.commit()

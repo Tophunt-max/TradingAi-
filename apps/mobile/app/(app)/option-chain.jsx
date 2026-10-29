@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { AppText, BottomSheet, Card, ChipRow, DataSourceBadge, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile } from '../../components/ui';
+import { router, useLocalSearchParams } from 'expo-router';
+import { AppText, Badge, BottomSheet, Button, Card, ChipRow, DataSourceBadge, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile, TextField } from '../../components/ui';
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { useExpiries, useOptionChain } from '../../features/market/api';
 import { isStale } from '../../features/system/api';
 import { fixed, formatINR, formatIST, formatPrice } from '../../services/format';
 import { QualityBanner } from '../../features/market/QualityBanner';
+import { ORDER_TONE } from '../../features/portfolio/Lists';
+import { newIdempotencyKey, usePaperEntry } from '../../features/trading/api';
 
 const fmtOI = (n) => (n == null ? '—' : Math.abs(n) >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : n.toLocaleString('en-IN'));
 const fmtStrike = (k) => (Number.isInteger(k) ? String(k) : fixed(k, 1));
@@ -40,6 +42,52 @@ function SideDetail({ title, side, lotSize }) {
       <KeyValue label="Volume" value={fmtOI(side.volume)} />
       <KeyValue label="Premium for 1 lot" value={lotSize && side.ask ? formatINR(side.ask * lotSize) : '—'} />
     </View>
+  );
+}
+
+function PaperBuy({ underlying, expiry, row, lotSize, source, onLeave }) {
+  const entry = usePaperEntry();
+  const [side, setSide] = useState('CE');
+  const [lots, setLots] = useState('1');
+  const [sl, setSl] = useState('20');
+  const [target, setTarget] = useState('30');
+  // One key per intended order: a retry after a network error returns the same order.
+  const [key, setKey] = useState(newIdempotencyKey);
+  const leg = side === 'CE' ? row.call : row.put;
+  const o = entry.data;
+  const submit = () =>
+    entry.mutate(
+      { underlying, option_type: side, expiry, strike: row.strike, lots: Number(lots), stop_loss_pct: sl, target_pct: target || null, idempotency_key: key },
+      { onSuccess: () => setKey(newIdempotencyKey()) },
+    );
+  const valid = Number.isInteger(Number(lots)) && Number(lots) >= 1 && Number(sl) > 0 && Number(sl) < 100 && (!target || Number(target) > 0);
+  return (
+    <Card testID="paper-buy">
+      <AppText variant="bodyStrong">Paper buy</AppText>
+      <SegmentedControl value={side} onChange={(v) => { setSide(v); entry.reset(); }} options={[{ value: 'CE', label: 'Buy CE' }, { value: 'PE', label: 'Buy PE' }]} testID="paper-side" />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TextField style={{ flex: 1 }} label="Lots" value={lots} onChangeText={setLots} keyboardType="number-pad" testID="paper-lots" />
+        <TextField style={{ flex: 1 }} label="Stop-loss %" value={sl} onChangeText={setSl} keyboardType="decimal-pad" testID="paper-sl" />
+        <TextField style={{ flex: 1 }} label="Target %" value={target} onChangeText={setTarget} keyboardType="decimal-pad" testID="paper-target" />
+      </View>
+      <AppText variant="caption" tone="faint">
+        {leg?.ask ? `Market order: fills at the ask (₹${fixed(leg.ask)}) plus 1 tick of slippage. ` : 'No ask price right now: the risk manager will reject a market buy. '}
+        {lotSize ? `1 lot = ${lotSize} units.` : source === 'DEMO' ? 'DEMO data: 1 lot = 1 unit (placeholder, not the NSE lot size).' : 'Lot size unavailable: the order will be rejected.'}
+        {' '}Global risk limits apply.
+      </AppText>
+      <Button title={`Place paper BUY ${side}`} icon="cart-outline" disabled={!valid || !leg} loading={entry.isPending} onPress={submit} testID="paper-submit" />
+      {entry.error ? <NoticeBanner tone="danger" testID="paper-error">{entry.error.message}</NoticeBanner> : null}
+      {o ? (
+        <View style={{ gap: 6 }} testID="paper-result">
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Badge label={o.status} tone={ORDER_TONE[o.status]} testID="paper-result-status" />
+            <AppText variant="caption">{o.instrument}{o.avg_fill_price ? ` · filled ${o.filled_qty} @ ₹${fixed(o.avg_fill_price)}` : ''}</AppText>
+          </View>
+          {o.reject_reason ? <AppText variant="caption" tone="negative">{o.reject_reason}</AppText> : null}
+          <Button title="View order" size="sm" variant="ghost" onPress={() => { onLeave(); router.push(`/orders/${o.id}`); }} testID="paper-view-order" />
+        </View>
+      ) : null}
+    </Card>
   );
 }
 
@@ -100,7 +148,7 @@ export default function OptionChain() {
                     key={r.strike}
                     testID={`strike-${r.strike}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`Strike ${r.strike} details`}
+                    accessibilityLabel={`Strike ${r.strike}${r.is_atm ? " ATM" : ""} details`}
                     onPress={() => setSelected(r)}
                     style={{ flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 9, borderBottomWidth: 1, borderColor: theme.colors.borderSubtle, backgroundColor: r.is_atm ? theme.colors.primarySoft : 'transparent' }}
                   >
@@ -145,9 +193,11 @@ export default function OptionChain() {
                     <SideDetail title="Call (CE)" side={selected.call} lotSize={d.lot_size} />
                     <SideDetail title="Put (PE)" side={selected.put} lotSize={d.lot_size} />
                   </View>
+                  <PaperBuy key={selected.strike} underlying={underlying} expiry={d.expiry} row={selected} lotSize={d.lot_size} source={d.source} onLeave={() => setSelected(null)} />
+                  <Button title="Charges calculator" icon="calculator-outline" size="sm" variant="ghost" onPress={() => { setSelected(null); router.push({ pathname: '/charges', params: { buy: selected.call?.ask ?? '', qty: d.lot_size ?? '' } }); }} />
                   <NoticeBanner>
                     {d.lot_size
-                      ? 'Premium for 1 lot excludes brokerage, taxes and slippage (charges calculator arrives with paper trading). '
+                      ? 'Premium for 1 lot excludes brokerage, taxes and slippage; see the charges calculator. '
                       : 'Required funds need the exchange lot size, which is not available in this mode. '}
                     The direction of the underlying is not the probability that an option position profits: theta, IV and spread also matter.
                   </NoticeBanner>

@@ -107,7 +107,7 @@ def test_state_machine_via_api(client, h):
     assert client.post(f"/api/v1/bots/{bot['id']}/pause", headers=h).status_code == 409
     b = start(client, h, bot)
     assert b["status"] == "ACTIVE" and b["run"]["status"] == "RUNNING"
-    assert b["run"]["mode"] == "SIGNAL_ONLY" and b["health"] == "WAITING_FOR_WORKER"
+    assert b["run"]["mode"] == "PAPER" and b["health"] == "WAITING_FOR_WORKER"
     r = client.post(f"/api/v1/bots/{bot['id']}/start", headers=h)
     assert r.status_code == 409 and r.json()["error"]["code"] == "INVALID_BOT_STATE"
     assert client.put(f"/api/v1/bots/{bot['id']}", headers=h,
@@ -140,7 +140,8 @@ def test_start_requires_activation_checks(client, h):
     cond = next(c for c in rep["checks"] if c["key"] == "conditions")
     assert cond["status"] == "FAIL" and rep["can_activate"] is False
     ok = client.post(f"/api/v1/bots/{create(client, h)['id']}/validate", headers=h).json()
-    assert ok["can_activate"] is True and ok["can_place_orders"] is False
+    assert ok["can_activate"] is True and ok["can_place_orders"] is True
+    assert ok["activation_mode"] == "PAPER"
     engine_chk = next(c for c in ok["checks"] if c["key"] == "engine")
     assert engine_chk["required_for"] == "ORDERS"
 
@@ -283,9 +284,9 @@ def test_health_ok_after_worker_pass_and_alerts(client, h, engine):
     comp = {c["name"]: c for c in health["components"]}
     assert comp["bot_worker"]["status"] == "ok"
     sig_alerts = client.get("/api/v1/alerts?category=SIGNALS", headers=h).json()
-    assert sig_alerts and "no order placed" in sig_alerts[0]["body"]
+    assert sig_alerts and "paper risk manager" in sig_alerts[0]["body"]
     bots_alerts = client.get("/api/v1/alerts?category=BOTS", headers=h).json()
-    assert any(a["title"] == "Bot started (signal-only)" for a in bots_alerts)
+    assert any(a["title"] == "Bot started" for a in bots_alerts)
     listed = client.get("/api/v1/bots?status=ACTIVE", headers=h).json()
     assert listed[0]["id"] == bot["id"] and listed[0]["run"]["last_bar_ts"]
 

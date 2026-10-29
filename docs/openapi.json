@@ -2280,6 +2280,7 @@
           "risk"
         ],
         "summary": "Kill Switch",
+        "description": "Engaging blocks new entries at once, cancels pending entry orders and (by policy)\nsends exit orders for every open position. Works even if market data is down: exits\nthat cannot fill yet are retried by the execution worker.",
         "operationId": "kill_switch_api_v1_risk_kill_switch_post",
         "requestBody": {
           "content": {
@@ -2382,6 +2383,23 @@
             }
           },
           {
+            "name": "bot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bot Id"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -2429,6 +2447,149 @@
         }
       }
     },
+    "/api/v1/orders/{order_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Order Detail",
+        "operationId": "order_detail_api_v1_orders__order_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/paper": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Manual Entry",
+        "description": "Manual paper BUY of one option contract. Goes through the same risk manager.",
+        "operationId": "manual_entry_api_v1_orders_paper_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualEntry"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{order_id}/cancel": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Cancel Order",
+        "operationId": "cancel_order_api_v1_orders__order_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/positions": {
       "get": {
         "tags": [
@@ -2454,6 +2615,23 @@
               "type": "string",
               "default": "OPEN",
               "title": "State"
+            }
+          },
+          {
+            "name": "bot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bot Id"
             }
           },
           {
@@ -2502,6 +2680,183 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/positions/{position_id}/exit": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Exit Position",
+        "operationId": "exit_position_api_v1_positions__position_id__exit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "position_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Position Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trades.csv": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Trades Csv",
+        "operationId": "trades_csv_api_v1_trades_csv_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/portfolio/charges": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Charges Breakdown",
+        "operationId": "charges_breakdown_api_v1_portfolio_charges_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Charges Breakdown Api V1 Portfolio Charges Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/charges/estimate": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Charges Estimate",
+        "operationId": "charges_estimate_api_v1_charges_estimate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargesEstimate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Charges Estimate Api V1 Charges Estimate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/alerts": {
@@ -4816,6 +5171,59 @@
         ],
         "title": "ChangePasswordRequest"
       },
+      "ChargesEstimate": {
+        "properties": {
+          "buy_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Buy Price"
+          },
+          "sell_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Sell Price"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Quantity"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "buy_price",
+          "sell_price",
+          "quantity"
+        ],
+        "title": "ChargesEstimate"
+      },
       "ComponentHealth": {
         "properties": {
           "name": {
@@ -5080,6 +5488,51 @@
           "metadata_note"
         ],
         "title": "ExpiriesPayload"
+      },
+      "FillOut": {
+        "properties": {
+          "broker_fill_id": {
+            "type": "string",
+            "title": "Broker Fill Id"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "string",
+            "title": "Price"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "charges": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Charges"
+          },
+          "charges_total": {
+            "type": "string",
+            "title": "Charges Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "broker_fill_id",
+          "side",
+          "quantity",
+          "price",
+          "ts",
+          "charges",
+          "charges_total"
+        ],
+        "title": "FillOut"
       },
       "FilterSpec": {
         "properties": {
@@ -5422,6 +5875,120 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "ManualEntry": {
+        "properties": {
+          "underlying": {
+            "type": "string",
+            "enum": [
+              "NIFTY",
+              "BANKNIFTY"
+            ],
+            "title": "Underlying"
+          },
+          "option_type": {
+            "type": "string",
+            "enum": [
+              "CE",
+              "PE"
+            ],
+            "title": "Option Type"
+          },
+          "expiry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry"
+          },
+          "strike": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strike"
+          },
+          "lots": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Lots",
+            "default": 1
+          },
+          "stop_loss_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Stop Loss Pct",
+            "default": "20"
+          },
+          "target_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Pct",
+            "default": "30"
+          },
+          "trailing_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMaximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailing Pct"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 48,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9\\-]+$",
+            "title": "Idempotency Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "underlying",
+          "option_type",
+          "idempotency_key"
+        ],
+        "title": "ManualEntry"
       },
       "MarketDataMode": {
         "type": "string",
@@ -5943,11 +6510,15 @@
         ],
         "title": "OptionSide"
       },
-      "OrderOut": {
+      "OrderDetail": {
         "properties": {
           "id": {
             "type": "string",
             "title": "Id"
+          },
+          "client_order_id": {
+            "type": "string",
+            "title": "Client Order Id"
           },
           "broker_order_id": {
             "anyOf": [
@@ -5960,9 +6531,41 @@
             ],
             "title": "Broker Order Id"
           },
+          "bot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Id"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
           "instrument": {
             "type": "string",
             "title": "Instrument"
+          },
+          "underlying": {
+            "type": "string",
+            "title": "Underlying"
+          },
+          "expiry": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiry"
+          },
+          "strike": {
+            "type": "string",
+            "title": "Strike"
+          },
+          "option_type": {
+            "type": "string",
+            "title": "Option Type"
           },
           "side": {
             "type": "string",
@@ -5976,13 +6579,40 @@
             "type": "string",
             "title": "Quantity"
           },
+          "lots": {
+            "type": "integer",
+            "title": "Lots"
+          },
+          "lot_size": {
+            "type": "integer",
+            "title": "Lot Size"
+          },
+          "lot_size_source": {
+            "type": "string",
+            "title": "Lot Size Source"
+          },
           "order_type": {
             "type": "string",
             "title": "Order Type"
           },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "filled_qty": {
+            "type": "integer",
+            "title": "Filled Qty"
           },
           "avg_fill_price": {
             "anyOf": [
@@ -5995,6 +6625,328 @@
             ],
             "title": "Avg Fill Price"
           },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "exit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Reason"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/OrderEventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "fills": {
+            "items": {
+              "$ref": "#/components/schemas/FillOut"
+            },
+            "type": "array",
+            "title": "Fills"
+          },
+          "risk_checks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Risk Checks"
+          },
+          "charges_estimate": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charges Estimate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "client_order_id",
+          "broker_order_id",
+          "bot_id",
+          "purpose",
+          "instrument",
+          "underlying",
+          "expiry",
+          "strike",
+          "option_type",
+          "side",
+          "quantity",
+          "lots",
+          "lot_size",
+          "lot_size_source",
+          "order_type",
+          "limit_price",
+          "status",
+          "filled_qty",
+          "avg_fill_price",
+          "stop_price",
+          "target_price",
+          "reject_reason",
+          "exit_reason",
+          "data_source",
+          "created_at",
+          "events",
+          "fills",
+          "risk_checks",
+          "charges_estimate"
+        ],
+        "title": "OrderDetail"
+      },
+      "OrderEventOut": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "to_status": {
+            "type": "string",
+            "title": "To Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "from_status",
+          "to_status",
+          "message"
+        ],
+        "title": "OrderEventOut"
+      },
+      "OrderOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "client_order_id": {
+            "type": "string",
+            "title": "Client Order Id"
+          },
+          "broker_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker Order Id"
+          },
+          "bot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Id"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "instrument": {
+            "type": "string",
+            "title": "Instrument"
+          },
+          "underlying": {
+            "type": "string",
+            "title": "Underlying"
+          },
+          "expiry": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiry"
+          },
+          "strike": {
+            "type": "string",
+            "title": "Strike"
+          },
+          "option_type": {
+            "type": "string",
+            "title": "Option Type"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "lots": {
+            "type": "integer",
+            "title": "Lots"
+          },
+          "lot_size": {
+            "type": "integer",
+            "title": "Lot Size"
+          },
+          "lot_size_source": {
+            "type": "string",
+            "title": "Lot Size Source"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "filled_qty": {
+            "type": "integer",
+            "title": "Filled Qty"
+          },
+          "avg_fill_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Fill Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          },
+          "exit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Reason"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -6004,13 +6956,30 @@
         "type": "object",
         "required": [
           "id",
+          "client_order_id",
           "broker_order_id",
+          "bot_id",
+          "purpose",
           "instrument",
+          "underlying",
+          "expiry",
+          "strike",
+          "option_type",
           "side",
           "quantity",
+          "lots",
+          "lot_size",
+          "lot_size_source",
           "order_type",
+          "limit_price",
           "status",
+          "filled_qty",
           "avg_fill_price",
+          "stop_price",
+          "target_price",
+          "reject_reason",
+          "exit_reason",
+          "data_source",
           "created_at"
         ],
         "title": "OrderOut"
@@ -6208,6 +7177,17 @@
             "type": "string",
             "title": "Note"
           },
+          "data_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Source"
+          },
           "capital": {
             "type": "string",
             "title": "Capital"
@@ -6223,6 +7203,10 @@
           "realized_pnl_today": {
             "type": "string",
             "title": "Realized Pnl Today"
+          },
+          "gross_pnl_today": {
+            "type": "string",
+            "title": "Gross Pnl Today"
           },
           "unrealized_pnl": {
             "type": "string",
@@ -6255,6 +7239,14 @@
           "daily_profit_lock": {
             "type": "string",
             "title": "Daily Profit Lock"
+          },
+          "loss_limit_hit": {
+            "type": "boolean",
+            "title": "Loss Limit Hit"
+          },
+          "profit_lock_hit": {
+            "type": "boolean",
+            "title": "Profit Lock Hit"
           }
         },
         "type": "object",
@@ -6262,10 +7254,12 @@
           "mode",
           "engine_active",
           "note",
+          "data_source",
           "capital",
           "available_funds",
           "used_margin",
           "realized_pnl_today",
+          "gross_pnl_today",
           "unrealized_pnl",
           "total_net_pnl",
           "charges_today",
@@ -6273,7 +7267,9 @@
           "max_entries_per_day",
           "open_positions",
           "daily_loss_limit",
-          "daily_profit_lock"
+          "daily_profit_lock",
+          "loss_limit_hit",
+          "profit_lock_hit"
         ],
         "title": "PortfolioSummary"
       },
@@ -6283,17 +7279,68 @@
             "type": "string",
             "title": "Id"
           },
+          "bot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Id"
+          },
           "instrument": {
             "type": "string",
             "title": "Instrument"
+          },
+          "underlying": {
+            "type": "string",
+            "title": "Underlying"
+          },
+          "expiry": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiry"
+          },
+          "strike": {
+            "type": "string",
+            "title": "Strike"
+          },
+          "option_type": {
+            "type": "string",
+            "title": "Option Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
           },
           "quantity": {
             "type": "string",
             "title": "Quantity"
           },
+          "lots": {
+            "type": "integer",
+            "title": "Lots"
+          },
+          "entry_qty": {
+            "type": "integer",
+            "title": "Entry Qty"
+          },
           "avg_price": {
             "type": "string",
             "title": "Avg Price"
+          },
+          "avg_exit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Exit"
           },
           "ltp": {
             "anyOf": [
@@ -6306,6 +7353,18 @@
             ],
             "title": "Ltp"
           },
+          "ltp_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltp At"
+          },
           "unrealized_pnl": {
             "anyOf": [
               {
@@ -6316,6 +7375,18 @@
               }
             ],
             "title": "Unrealized Pnl"
+          },
+          "realized_gross": {
+            "type": "string",
+            "title": "Realized Gross"
+          },
+          "charges": {
+            "type": "string",
+            "title": "Charges"
+          },
+          "realized_net": {
+            "type": "string",
+            "title": "Realized Net"
           },
           "stop_loss": {
             "anyOf": [
@@ -6339,23 +7410,78 @@
             ],
             "title": "Target"
           },
+          "trailing_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailing Pct"
+          },
+          "exit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Reason"
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source"
+          },
           "opened_at": {
             "type": "string",
             "format": "date-time",
             "title": "Opened At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
           }
         },
         "type": "object",
         "required": [
           "id",
+          "bot_id",
           "instrument",
+          "underlying",
+          "expiry",
+          "strike",
+          "option_type",
+          "status",
           "quantity",
+          "lots",
+          "entry_qty",
           "avg_price",
+          "avg_exit",
           "ltp",
+          "ltp_at",
           "unrealized_pnl",
+          "realized_gross",
+          "charges",
+          "realized_net",
           "stop_loss",
           "target",
-          "opened_at"
+          "trailing_pct",
+          "exit_reason",
+          "data_source",
+          "opened_at",
+          "closed_at"
         ],
         "title": "PositionOut"
       },
@@ -7154,6 +8280,14 @@
             "type": "string",
             "title": "Square Off Time Ist"
           },
+          "exit_on_loss_limit": {
+            "type": "boolean",
+            "title": "Exit On Loss Limit"
+          },
+          "square_off_on_kill_switch": {
+            "type": "boolean",
+            "title": "Square Off On Kill Switch"
+          },
           "kill_switch_engaged": {
             "type": "boolean",
             "title": "Kill Switch Engaged"
@@ -7183,6 +8317,8 @@
           "max_lots_per_trade",
           "re_entry_after_stop_loss",
           "square_off_time_ist",
+          "exit_on_loss_limit",
+          "square_off_on_kill_switch",
           "kill_switch_engaged",
           "kill_switch_changed_at"
         ],
@@ -7311,6 +8447,28 @@
               }
             ],
             "title": "Square Off Time Ist"
+          },
+          "exit_on_loss_limit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit On Loss Limit"
+          },
+          "square_off_on_kill_switch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Square Off On Kill Switch"
           }
         },
         "additionalProperties": false,
@@ -7444,6 +8602,15 @@
           "disclaimer": {
             "type": "string",
             "title": "Disclaimer"
+          },
+          "exposure": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Exposure",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -8220,7 +9387,10 @@
           },
           "activation_mode": {
             "type": "string",
-            "const": "SIGNAL_ONLY",
+            "enum": [
+              "SIGNAL_ONLY",
+              "PAPER"
+            ],
             "title": "Activation Mode",
             "default": "SIGNAL_ONLY"
           },

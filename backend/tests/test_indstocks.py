@@ -368,8 +368,8 @@ def test_bot_validation_reads_lot_size_from_master(live_api, engine, fake):
     assert checks["contract"]["status"] == "PASS"
     assert "lot size 75, tick size 0.05 " in checks["contract"]["message"]
     assert checks["data"]["status"] == "PASS"
-    assert checks["engine"]["status"] == "FAIL" and report["can_place_orders"] is False
-    assert report["can_activate"] is True  # signal-only activation is allowed
+    assert checks["engine"]["status"] == "PASS" and checks["live"]["status"] == "WARN"
+    assert report["can_activate"] is True and report["can_place_orders"] is True  # paper only
 
 
 def test_expired_token_maps_to_clear_error(live_api, engine, fake):

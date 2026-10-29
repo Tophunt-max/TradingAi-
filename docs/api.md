@@ -59,13 +59,22 @@ served at `http://localhost:8000/docs` in development and test only.
 | POST | `/bots/{id}/clone` | ✓ | |
 | DELETE | `/bots/{id}?confirm=true` | ✓ | Requires explicit confirmation |
 | POST | `/bots/{id}/validate` | ✓ | Pre-activation checks against global limits |
-| POST | `/bots/{id}/start\|pause\|resume\|stop` | ✓ | State machine (409 `INVALID_BOT_STATE`); start/resume re-validate (409 `VALIDATION_FAILED`). Runs are signal-only |
+| POST | `/bots/{id}/start\|pause\|resume\|stop` | ✓ | State machine (409 `INVALID_BOT_STATE`); start/resume re-validate (409 `VALIDATION_FAILED`). Runs are PAPER when paper trading is enabled (signals go to the risk manager), else signal-only |
 | GET | `/bots/{id}/signals`, `/bots/{id}/events`, `/bots/{id}/runs` | ✓ | Recorded signals, bot log, run history |
-| GET | `/risk` | ✓ | Global limits, usage, block reasons |
+| GET | `/risk` | ✓ | Global limits, policies, usage, block reasons, exposure by bot |
 | PATCH | `/risk/limits` | ✓ | Cross-field validated, audited |
-| POST | `/risk/kill-switch` | ✓ | `{engaged, confirm: true}`; persisted |
-| GET | `/portfolio`, `/orders`, `/positions` | ✓ | Real paper ledger (empty until Phase 6) |
-| GET | `/alerts?category=` | ✓ | Derived from your audit trail |
+| POST | `/risk/kill-switch` | ✓ | `{engaged, confirm: true}`; persisted. Engaging cancels pending entries and, if `square_off_on_kill_switch`, sends exits |
+| GET | `/portfolio` | ✓ | Paper account: funds, used margin, realised/unrealised/net P&L, charges, loss/profit lock flags |
+| GET | `/orders?status=PENDING\|EXECUTED\|CANCELLED\|REJECTED&bot_id=` | ✓ | Paginated |
+| GET | `/orders/{id}` | ✓ | Order + timeline events, fills with charges, risk checks, charges estimate |
+| POST | `/orders/paper` | ✓ | Manual paper BUY `{underlying, option_type, expiry?, strike?, lots, stop_loss_pct, target_pct?, trailing_pct?, idempotency_key}`; same key returns the same order. 201 even when the risk manager rejects (see `status`, `reject_reason`); 422 `NO_LOT_SIZE` |
+| POST | `/orders/{id}/cancel` | ✓ | 409 `ORDER_NOT_CANCELLABLE` |
+| GET | `/positions?state=OPEN\|CLOSED&bot_id=` | ✓ | Mark-to-market, SL/target, realised gross/charges/net |
+| POST | `/positions/{id}/exit` | ✓ | Market exit; waits for a bid if there is none |
+| GET | `/trades.csv` | ✓ | Closed paper trades (IST times) |
+| GET | `/portfolio/charges?day=` | ✓ | Charges breakdown from fills |
+| POST | `/charges/estimate` | ✓ | `{buy_price, sell_price, quantity, trade_date?}` → breakdown, net P&L, break-even |
+| GET | `/alerts?category=` | ✓ | From your audit trail, bot signals/errors, paper fills/rejections and loss/profit lock hits |
 | GET | `/brokers` | ✓ | Paper adapter + planned brokers (none integrated) |
 | GET | `/market/provider-status` | ✓ | Provider health, instrument-sync times, price-feed heartbeat |
 | POST | `/admin/market-data/sync-instruments` | admin | Download the INDstocks instrument master |
