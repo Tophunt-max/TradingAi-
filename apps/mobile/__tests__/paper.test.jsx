@@ -24,7 +24,8 @@ describe('paper trading UI', () => {
   it('shows an open position with live P&L and an exit button', async () => {
     await wrap(<PositionCard p={base} />);
     expect(screen.getByText('NIFTY 24000 CE')).toBeTruthy();
-    expect(screen.getByText('PAPER')).toBeTruthy();
+    expect(screen.getByText('DEMO · VIRTUAL')).toBeTruthy();
+    expect(screen.getByText('INDSTOCKS')).toBeTruthy();
     expect(screen.getByText('Unrealised (gross)')).toBeTruthy();
     expect(screen.getByText('Exit at market')).toBeTruthy();
     expect(screen.getByText('+19.40%')).toBeTruthy();

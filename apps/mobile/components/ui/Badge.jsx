@@ -33,9 +33,12 @@ export function Badge({ label, tone = 'neutral', testID }) {
 export function DataSourceBadge({ source, stale = false }) {
   if (stale) return <Badge label="STALE" tone="warning" testID="badge-stale" />;
   const tone = { LIVE: 'positive', DELAYED: 'warning', DEMO: 'info', PAPER: 'primary' }[source] ?? 'neutral';
-  return <Badge label={source ?? 'UNKNOWN'} tone={tone} testID={`badge-${(source ?? 'unknown').toLowerCase()}`} />;
+  // Synthetic prices are "SIMULATED" so they are not confused with the DEMO account mode.
+  const label = source === 'DEMO' ? 'SIMULATED' : source ?? 'UNKNOWN';
+  return <Badge label={label} tone={tone} testID={`badge-${(source ?? 'unknown').toLowerCase()}`} />;
 }
 
+/** Account mode of a bot/order: PAPER executes in the DEMO account, LIVE in the REAL one. */
 export function ModeBadge({ live }) {
-  return live ? <Badge label="LIVE" tone="negative" /> : <Badge label="PAPER" tone="primary" />;
+  return live ? <Badge label="REAL" tone="negative" /> : <Badge label="DEMO · VIRTUAL" tone="primary" />;
 }

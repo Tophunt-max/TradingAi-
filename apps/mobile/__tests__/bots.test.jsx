@@ -41,6 +41,6 @@ describe('bot config helpers', () => {
     expect(screen.getByText('Custom Manual')).toBeTruthy();
     expect(screen.getByText('NIFTY CE · buy only')).toBeTruthy();
     expect(screen.getByText('No entry conditions defined.')).toBeTruthy();
-    expect(screen.getByText('PAPER')).toBeTruthy();
+    expect(screen.getByText('DEMO · VIRTUAL')).toBeTruthy();
   });
 });

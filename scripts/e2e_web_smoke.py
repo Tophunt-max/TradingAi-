@@ -123,6 +123,14 @@ def main() -> int:
             expect(page.get_by_test_id("trading-mode-banner")).to_contain_text("LIVE LOCKED")
             if shots:
                 page.screenshot(path=str(shots / "02-home.png"), full_page=True)
+            # Account-mode selector: DEMO active, REAL listed as unavailable with a reason.
+            page.get_by_test_id("account-mode-selector").click()
+            expect(page.get_by_test_id("account-mode-option-real")).to_contain_text("UNAVAILABLE")
+            expect(page.get_by_test_id("account-mode-option-demo")).to_contain_text("ACTIVE")
+            if shots:
+                page.screenshot(path=str(shots / "02b-account-mode.png"), full_page=True)
+            page.get_by_test_id("account-mode-option-demo").click()
+            expect(page.get_by_test_id("account-mode-sheet")).to_have_count(0, timeout=5_000)
 
             def shot(name: str) -> None:
                 if shots:
@@ -261,6 +269,10 @@ def main() -> int:
             page.get_by_role("button", name="Profile and settings").click()
             expect(page.get_by_text("App preferences")).to_be_visible(timeout=10_000)
             shot("12-settings")
+            page.get_by_role("button", name="Help & Support").click()
+            expect(page.get_by_test_id("support-contact")).to_be_visible(timeout=10_000)
+            shot("13-help")
+            page.go_back()
             page.get_by_test_id("logout").click()
             page.get_by_role("alert").get_by_role("button", name="Log out").click()
             expect(page.get_by_test_id("welcome-login")).to_be_visible(timeout=10_000)

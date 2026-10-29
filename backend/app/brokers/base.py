@@ -1,6 +1,6 @@
 """Broker adapter interface.
 
-Every broker integration (paper now, a verified real broker in Phase 8)
+Every broker integration (paper now, a verified real broker in Phase 7)
 implements this protocol. The execution layer never assumes that a successful
 call means an order was filled: fills are read back from the broker.
 """

@@ -1,6 +1,8 @@
 # QuantAI F&O architecture
 
-Status: **Phase 1 (foundation)**. Boxes marked *planned* do not exist yet.
+Status: v2 plan, **Phase 1 done** (see [implementation-plan.md](implementation-plan.md)).
+The original phases 1–6 (auth, UI, INDstocks data, analysis, bots, risk + paper execution)
+are implemented. Boxes marked *planned* do not exist yet.
 
 ```mermaid
 flowchart LR
@@ -17,24 +19,41 @@ flowchart LR
     GW[Middleware<br/>request id, security headers, CORS] --> R[/api/v1 routers/]
     R --> AUTH[Auth service<br/>argon2, JWT, rotating refresh tokens, OTP]
     R --> AUD[Audit log]
-    R --> DEMO[Demo market data<br/>labelled DEMO]
-    R -. planned .-> RISK[Global risk manager]
-    R -. planned .-> EXEC[Order state machine / paper execution]
-    R -. planned .-> AI[Analysis + AI pipeline]
+    R --> MD0[Market data<br/>INDstocks read-only / SIMULATED]
+    R --> AI[Analysis + AI pipeline]
+    R --> RISK[Global risk manager]
+    RISK --> EXEC[Order state machine]
+    EXEC --> PAPER[Paper execution<br/>DEMO account]
+    EXEC -. planned Phase 7 .-> REALX[Real broker adapter<br/>REAL account]
+    R -. planned Phase 3 .-> ACC[Accounts + demo ledger<br/>per-mode isolation]
     AUTH --> DB[(PostgreSQL)]
     AUD --> DB
     R --> RL[Rate limiter] --> REDIS[(Redis)]
   end
 
-  subgraph Workers["Persistent workers (planned)"]
-    MD[Market-data worker]
-    AIW[AI worker]
-    BOT[Bot execution worker]
-    MON[Monitoring worker]
+  subgraph Workers["Persistent workers"]
+    MD[Price-feed worker]
+    BOT[Bot worker<br/>leased runs]
+    EXW[Execution pass<br/>singleton lease]
+    MON[Monitoring worker - planned]
   end
-  Workers -. planned .-> DB
-  BROKER[Verified broker API<br/>planned, Phase 8] -. planned .-> EXEC
+  Workers --> DB
+  BROKER[Verified broker API<br/>planned, Phase 7] -. planned .-> REALX
 ```
+
+## Account modes
+
+The app has one UI and two financial account modes:
+
+- **DEMO** (`DEMO · VIRTUAL` badge): ₹10,000 virtual funds, simulated orders and fills.
+- **REAL** (`REAL` badge): funds, orders and positions from a verified broker. Not available yet.
+
+Synthetic market prices are a different concept and show a `SIMULATED` badge. The shared
+strategy, AI and risk code produces a trade proposal; the server (never the client) decides
+which execution adapter receives it from the account it belongs to. The isolation design
+(accounts table, demo ledger, composite keys, adapter guards) is in
+[implementation-plan.md](implementation-plan.md#account-isolation-design-phase-3-for-review).
+Today only the DEMO path exists and the selector shows REAL as unavailable.
 
 ## Principles applied in Phase 1
 

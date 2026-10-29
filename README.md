@@ -10,7 +10,22 @@ An AI-assisted analysis and paper-trading platform for Indian index derivatives
 > not live profits and do not guarantee future returns. **Live trading is disabled in
 > this build.**
 
-## Current status: Phase 6 (risk manager + paper execution) complete
+## v2 plan: Demo and Real account modes
+
+The master prompt now asks for two account modes in one app: **DEMO** (₹10,000 virtual money)
+and **REAL** (funds and orders from a connected broker). v2 Phase 1 is done: repository
+inspection and gap analysis ([docs/implementation-plan.md](docs/implementation-plan.md)), an
+updated [architecture](docs/architecture.md), an account-mode selector on Home (DEMO active,
+REAL shown as unavailable with the reason), `DEMO · VIRTUAL` / `REAL` badges, a Help & Support
+screen, and the `SIMULATED` label for synthetic market prices so it is not confused with the
+DEMO account. The backend account model, demo ledger and reset come in v2 Phase 3.
+
+**Hinglish:** ab app mein do account mode honge: **DEMO** (₹10,000 virtual paisa) aur **REAL**
+(broker se asli funds). Abhi sirf DEMO chalta hai; REAL "unavailable" dikhta hai jab tak verified
+broker connect na ho. Nakli market prices par ab "SIMULATED" badge aata hai, taaki DEMO account se
+confusion na ho.
+
+## Status of the original phases 1–6: complete
 
 Paper trading now works end to end. Every entry, from any bot or a manual buy on the option
 chain, passes one **global risk manager** (kill switch, daily loss stop, profit lock, entries
@@ -141,7 +156,9 @@ npx expo export --platform web           # bundle check
 python scripts/e2e_web_smoke.py --dist apps/mobile/dist      # browser E2E (needs playwright)
 ```
 
-## Implementation plan
+## Implementation plan (original numbering)
+
+Superseded by the v2 phase plan in [docs/implementation-plan.md](docs/implementation-plan.md); kept for history.
 
 | Phase | Scope |
 |---|---|

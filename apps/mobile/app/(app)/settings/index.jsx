@@ -106,7 +106,7 @@ export default function Settings() {
         <ListRow title="Broker connections" icon="link-outline" onPress={() => router.push('/feature/brokers')} />
         <ListRow title="Trading permissions" subtitle="Paper only · live trading locked" icon="lock-closed-outline" />
         <ListRow title="System health" icon="pulse-outline" onPress={() => router.push('/system-health')} />
-        <ListRow title="Help & education" icon="help-circle-outline" onPress={() => router.push('/feature/education')} />
+        <ListRow title="Help & Support" icon="help-circle-outline" onPress={() => router.push('/help')} />
         <Divider />
         <ListRow title="Log out" icon="log-out-outline" destructive onPress={() => setConfirm(true)} testID="logout" />
       </Card>

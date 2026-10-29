@@ -36,7 +36,7 @@ export function ConfigSummary({ config, strategyName }) {
         <KeyValue label="Max open positions" value={c.risk.max_open_positions} />
         <KeyValue label="Re-entry after SL" value={c.risk.re_entry_after_stop_loss ? 'Allowed' : 'Disabled'} />
         <KeyValue label="Session" value={`${c.session.start_ist}–${c.session.end_ist} IST · cooldown ${c.session.cooldown_minutes}m`} />
-        <KeyValue label="Mode" value="PAPER" tone="primary" />
+        <KeyValue label="Account" value="DEMO · VIRTUAL" tone="primary" />
       </Card>
     </>
   );

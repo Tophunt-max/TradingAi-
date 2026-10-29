@@ -13,7 +13,7 @@ executed order (the INDmoney app lists Rs 20), so it is configurable.
 
 Not modelled: IPFT, STT on exercise of in-the-money options at expiry (the
 platform squares off before expiry), and exchange rounding. Estimates must be
-reconciled against broker contract notes (Phase 8).
+reconciled against broker contract notes (Phase 7).
 """
 
 from __future__ import annotations

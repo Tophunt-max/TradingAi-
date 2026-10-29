@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { AppText, Badge, Button, Card, CardHeader, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile } from '../../../components/ui';
+import { AccountModeBadge, AppText, Button, Card, CardHeader, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile } from '../../../components/ui';
 import { OrdersList, PositionCard, PositionsList } from '../../../features/portfolio/Lists';
 import { usePortfolio, usePositions } from '../../../features/trading/api';
 import { formatINR } from '../../../services/format';
@@ -27,7 +27,7 @@ function Summary() {
       {(p) => (
         <>
           <Card testID="portfolio-summary">
-            <CardHeader title="Total P&L" subtitle="Paper account · net of charges" right={<Badge label="PAPER" tone="primary" />} />
+            <CardHeader title="Total P&L" subtitle="Demo account · virtual funds · net of charges" right={<AccountModeBadge mode="DEMO" />} />
             <AppText variant="display" tone={Number(p.total_net_pnl) > 0 ? 'positive' : Number(p.total_net_pnl) < 0 ? 'negative' : 'default'}>
               {formatINR(p.total_net_pnl)}
             </AppText>

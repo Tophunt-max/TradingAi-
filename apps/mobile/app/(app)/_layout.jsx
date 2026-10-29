@@ -26,6 +26,7 @@ const TITLES = {
   brokers: 'Broker Connections',
   screener: 'Market Screener',
   education: 'Learn & Grow',
+  help: 'Help & Support',
   models: 'AI Model Lab',
 };
 

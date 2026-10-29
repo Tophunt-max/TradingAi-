@@ -307,7 +307,7 @@ def validate(
         "shared limits before a simulated order is sent." if paper_enabled else
         "Paper trading is disabled, so the bot runs signal-only.", "ORDERS")
     add("live", "Live trading", None,
-        "Locked: no verified broker order adapter (Phase 8).", "ORDERS")
+        "Locked: no verified broker order adapter (Phase 7).", "ORDERS")
 
     activation = [c for c in checks if c.required_for == "ACTIVATION"]
     return ValidationReport(

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { AppText, Badge, Button, Card, ChipRow, ConfirmDialog, KeyValue, NoticeBanner, PnLText, QueryState, StateView } from '../../components/ui';
+import { AccountModeBadge, AppText, Badge, Button, Card, ChipRow, ConfirmDialog, DataSourceBadge, KeyValue, NoticeBanner, PnLText, QueryState, StateView } from '../../components/ui';
 import { useExitPosition, useOrders, usePositions } from '../trading/api';
 import { fixed, formatINR, formatIST } from '../../services/format';
 
@@ -34,8 +34,8 @@ export const exitLabel = (r) => EXIT_LABEL[r] ?? r ?? '—';
 export function SourceBadges({ dataSource, lotSource }) {
   return (
     <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
-      <Badge label="PAPER" tone="primary" />
-      <Badge label={dataSource} tone={dataSource === 'DEMO' ? 'info' : 'positive'} />
+      <AccountModeBadge mode="DEMO" />
+      <DataSourceBadge source={dataSource} />
       {lotSource === 'DEMO_PLACEHOLDER' ? <Badge label="PLACEHOLDER LOT" tone="warning" /> : null}
     </View>
   );

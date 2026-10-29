@@ -28,6 +28,7 @@ export default function More() {
         <CardHeader title="Account & system" />
         <ListRow title="Profile & Settings" icon="person-circle-outline" onPress={() => router.push('/settings')} />
         <ListRow title="System Health" icon="pulse-outline" onPress={() => router.push('/system-health')} />
+        <ListRow title="Help & Support" icon="help-buoy-outline" onPress={() => router.push('/help')} testID="more-help" />
       </Card>
     </Screen>
   );

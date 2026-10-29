@@ -60,7 +60,7 @@ function History() {
               value={`↑${Math.round(p.p_up * 100)} ↔${Math.round(p.p_sideways * 100)} ↓${Math.round(p.p_down * 100)} · ${p.outcome ?? 'pending'}`}
             />
           ))}
-          <AppText variant="caption" tone="faint">Outcome scoring, drift monitoring and shadow testing arrive in Phase 7.</AppText>
+          <AppText variant="caption" tone="faint">Outcome scoring, drift monitoring and shadow testing arrive in Phase 8.</AppText>
         </Card>
       )}
     </QueryState>

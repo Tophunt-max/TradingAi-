@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { AppText, Badge, Button, Card, CardHeader, KeyValue, ListRow, QuickAction, Screen, StatTile } from '../../../components/ui';
+import { AccountModeBadge, AccountModeSelector, AppText, Badge, Button, Card, CardHeader, KeyValue, ListRow, QuickAction, Screen, StatTile } from '../../../components/ui';
+import { useAccountMode } from '../../../features/account/mode';
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { BrandMark } from '../../../features/auth/BrandMark';
 import { IndexHeroCards } from '../../../features/market/IndexHeroCards';
@@ -63,9 +64,10 @@ function PerformanceCard() {
   const d = p.data;
   return (
     <Card testID="performance-card">
-      <CardHeader title="Today's Performance" subtitle="Paper account" right={<Badge label="PAPER" tone="primary" />} />
+      <CardHeader title="Today's Performance" subtitle="Demo account · virtual funds" right={<AccountModeBadge mode="DEMO" />} />
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-        <StatTile label="Total P&L" value={d ? formatINR(d.total_net_pnl) : '—'} />
+        <StatTile label="Virtual balance" value={d ? formatINR(d.available_funds) : '—'} sub={d ? `Capital ${formatINR(d.capital)}` : undefined} />
+        <StatTile label="Today's P&L" value={d ? formatINR(d.realized_pnl_today) : '—'} sub={d ? `Total net ${formatINR(d.total_net_pnl)}` : undefined} />
         <StatTile label="Trades" value={d ? `${d.trades_today} / ${d.max_entries_per_day}` : '—'} sub={d ? `Open positions ${d.open_positions}` : undefined} />
       </View>
       {d && !d.engine_active ? <AppText variant="caption" tone="faint" style={{ marginTop: 8 }}>{d.note}</AppText> : null}
@@ -80,7 +82,7 @@ function RiskAndBotsCard() {
   return (
     <Card>
       <CardHeader title="Risk & Bots" right={<Button title="Risk Center" size="sm" variant="ghost" onPress={() => router.push('/risk-center')} />} />
-      <KeyValue label="Daily loss limit used" value={r ? `${formatINR(0)} / ${formatINR(r.limits.daily_loss_limit)}` : '—'} />
+      <KeyValue label="Daily loss limit used" value={r ? `${formatINR(Math.max(-(Number(r.usage.realized_pnl) + Number(r.usage.unrealized_pnl)), 0))} / ${formatINR(r.limits.daily_loss_limit)}` : '—'} />
       <KeyValue label="Entries used" value={r ? `${r.usage.entries_used} / ${r.limits.max_entries_per_day}` : '—'} />
       <KeyValue label="Kill switch" value={r ? (r.limits.kill_switch_engaged ? 'ENGAGED' : 'Off') : '—'} tone={r?.limits.kill_switch_engaged ? 'negative' : undefined} />
       <KeyValue
@@ -112,6 +114,7 @@ function RecentAlerts() {
 
 export default function Home() {
   const user = useAuthStore((s) => s.user);
+  const account = useAccountMode();
   const qc = useQueryClient();
   const { columns } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
@@ -160,6 +163,7 @@ export default function Home() {
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
       {header}
+      <AccountModeSelector value={account.mode} options={account.options} onChange={account.setMode} />
       <TradingModeBanner />
       {columns > 1 ? (
         <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>

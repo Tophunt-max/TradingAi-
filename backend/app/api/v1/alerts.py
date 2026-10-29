@@ -153,7 +153,7 @@ class BrokerOut(BaseModel):
 
 @router.get("/brokers", response_model=list[BrokerOut])
 def brokers(_: AuthDep) -> list[BrokerOut]:
-    pending = ("No verified adapter yet. Integration is Phase 8 and uses only the broker's "
+    pending = ("No verified adapter yet. Integration is Phase 7 and uses only the broker's "
                "official API.")
     return [
         BrokerOut(id="paper", name="Paper Trading", kind="PAPER", status="CONNECTED",

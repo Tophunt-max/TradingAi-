@@ -14,7 +14,7 @@ describe('design system', () => {
         <DataSourceBadge source="LIVE" stale />
       </>,
     );
-    expect(screen.getByText('DEMO')).toBeTruthy();
+    expect(screen.getByText('SIMULATED')).toBeTruthy();
     expect(screen.getByText('LIVE')).toBeTruthy();
     expect(screen.getByText('STALE')).toBeTruthy();
   });

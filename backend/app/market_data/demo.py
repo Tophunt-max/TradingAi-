@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-DEMO_DISCLAIMER = "DEMO data: synthetic values for UI testing only. Not real market prices."
+DEMO_DISCLAIMER = "Simulated market data: synthetic values for testing. Not real market prices."
 
 
 @dataclass(frozen=True)
