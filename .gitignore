@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.db
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+apps/mobile/ios/
+apps/mobile/android/
+*.log
+
+# OS
+.DS_Store

@@ -1,0 +1,23 @@
+"""Import all models so Alembic autogenerate and metadata.create_all see them."""
+
+from app.models.audit import AuditLog
+from app.models.auth import (
+    RefreshToken,
+    UserSession,
+    VerificationChannel,
+    VerificationCode,
+    VerificationPurpose,
+)
+from app.models.user import User, UserPreferences, UserRole
+
+__all__ = [
+    "AuditLog",
+    "RefreshToken",
+    "User",
+    "UserPreferences",
+    "UserRole",
+    "UserSession",
+    "VerificationChannel",
+    "VerificationCode",
+    "VerificationPurpose",
+]

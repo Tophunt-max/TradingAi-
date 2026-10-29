@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "QuantAI F&O",
+    "slug": "quantai-fo",
+    "scheme": "quantai",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0A0E1A",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.quantai.fo"
+    },
+    "android": {
+      "package": "com.quantai.fo",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#05070F"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
