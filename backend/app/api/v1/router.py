@@ -9,7 +9,10 @@ from app.api.v1 import (
     backtests,
     bots,
     charts,
+    events,
+    fundamentals,
     health,
+    learning,
     market,
     models,
     options,
@@ -26,3 +29,5 @@ for module in (health, system, auth, users, admin, accounts, market, charts, opt
     api_router.include_router(module.router)
 api_router.include_router(backtests.router)
 api_router.include_router(patterns.router)
+for module in (fundamentals, events, learning):
+    api_router.include_router(module.router)

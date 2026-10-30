@@ -15,8 +15,10 @@ from app.db.base import Base, UUIDPkMixin
 class ModelVersion(UUIDPkMixin, Base):
     """An immutable trained model plus its walk-forward evaluation.
 
-    status: CANDIDATE (evaluated), PROMOTED (serving), RETIRED, REJECTED
-    (failed the gate). Only one PROMOTED version per symbol/timeframe/horizon.
+    status: CANDIDATE (evaluated), SHADOW (live predictions recorded but never
+    shown or used), PROMOTED (serving), RETIRED, ROLLED_BACK, REJECTED (failed the
+    gate). Only one PROMOTED version per symbol/timeframe/horizon. See
+    app.learning.promotion for the acceptance criteria of each transition.
     """
 
     __tablename__ = "model_versions"
@@ -44,6 +46,8 @@ class ModelVersion(UUIDPkMixin, Base):
     created_at: Mapped[datetime] = mapped_column(default=utcnow, server_default=func.now())
     promoted_at: Mapped[datetime | None]
     retired_at: Mapped[datetime | None]
+    shadow_started_at: Mapped[datetime | None]
+    rolled_back_at: Mapped[datetime | None]
 
 
 class Prediction(UUIDPkMixin, Base):

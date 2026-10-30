@@ -27,6 +27,7 @@ from app.indicators.core import (
     fibonacci,
     fibonacci_extension,
 )
+from app.strategies.router import route as route_strategies
 from app.strategies.rules import evaluate as eval_strategies
 
 PROB_FILTER = 0.70
@@ -35,6 +36,11 @@ RECENT_EVENTS = 12
 
 def _step(key: str, label: str, status: str, detail: str) -> dict[str, str]:
     return {"key": key, "label": label, "status": status, "detail": detail}
+
+
+def _probs_text(p: dict[str, float], sep: str) -> str:
+    """UP / SIDEWAYS / DOWN as percentages; binary models have no SIDEWAYS class."""
+    return sep.join(f"{k} {p[k]:.0%}" for k in ("UP", "SIDEWAYS", "DOWN") if k in p)
 
 
 def _r(v: float | None, d: int = 2) -> float | None:
@@ -186,7 +192,9 @@ def _setup(ctx: C.Ctx, side: str) -> dict[str, Any] | None:
 
 def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: dict[str, Any],
         is_demo: bool, predict_fn: Callable[[C.Ctx, str | None], dict[str, Any] | None],
-        chain_fn: Callable[[], dict[str, Any] | None] | None) -> dict[str, Any]:
+        chain_fn: Callable[[], dict[str, Any] | None] | None,
+        event_risk_level: str | None = None,
+        event_risk: dict[str, Any] | None = None) -> dict[str, Any]:
     steps: list[dict[str, str]] = []
     reasons: list[str] = []
     q_status = quality.get("status", "OK")
@@ -218,7 +226,14 @@ def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: 
                        f"{len(pats)} pattern events, {len(smc['structure_events'])} structure "
                        "breaks in the window."))
 
+    regime_v2 = R.detect_v2(ctx, smc=smc, event_risk_level=event_risk_level,
+                            quality_status=q_status)
     prediction = predict_fn(ctx, regime["label"] if regime else None)
+    router = route_strategies(regime_v2, model_available=bool(
+        prediction and prediction.get("probabilities")))
+    if regime_v2["no_trade"]:
+        reasons.append(f"Regime v2 state {regime_v2['state']}: the strategy router returns "
+                       "NO TRADE.")
     strategies = eval_strategies(ctx, timeframe, regime, pats, smc, prediction)
     live = [s for s in strategies if s["direction"] in ("CE", "PE")]
     usable = [s for s in live if s["regime_compatible"] is not False]
@@ -235,8 +250,7 @@ def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: 
     else:
         p = prediction["probabilities"]
         steps.append(_step("prediction", "AI prediction", "DONE",
-                           f"UP {p['UP']:.0%} · SIDEWAYS {p['SIDEWAYS']:.0%} · "
-                           f"DOWN {p['DOWN']:.0%}"))
+                           _probs_text(p, " · ")))
         if max(p["UP"], p["DOWN"]) < PROB_FILTER:
             reasons.append(f"No direction reaches the {PROB_FILTER:.0%} research filter.")
 
@@ -266,6 +280,12 @@ def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: 
                        "The global risk manager arrives in Phase 6."))
     reasons.append("Charges estimation and independent risk validation are not built yet "
                    "(Phase 6), so no trade can be proposed.")
+    # Deterministic event-risk gate (app.events.risk); additive, never relaxes a NO TRADE.
+    if event_risk and event_risk["action"] == "NO_TRADE":
+        reasons.append("Event-risk gate: HIGH-importance event in the window (NO TRADE).")
+    elif event_risk and event_risk["action"] == "REDUCE_EXPOSURE":
+        reasons.append("Event-risk gate: MEDIUM-importance event in the window (reduce "
+                       "exposure).")
     steps.append(_step("decision", "Trade proposal or NO TRADE", "DONE", "NO TRADE"))
 
     ph, pl = PAT.pivots(ctx)
@@ -283,7 +303,8 @@ def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: 
         "trend_method": "Rule-based: EMA 9/21, price vs EMA 50, RSI 14 (not a probability)",
         "signals": signals, "support": support, "resistance": resistance,
         "atr": snap["atr14"], "rsi": snap["rsi14"],
-        "regime": regime, "indicators": snap, "structure": struct,
+        "regime": regime, "regime_v2": regime_v2, "strategy_router": router,
+        "indicators": snap, "structure": struct,
         "patterns": _public(pats, n),
         "smc": {
             "trend": smc["trend"],
@@ -314,6 +335,7 @@ def run(*, candles: list[dict[str, Any]], timeframe: str, symbol: str, quality: 
         "options": options,
         "pipeline": steps,
         "decision": "NO_TRADE",
+        "event_risk": event_risk,
         "abstain_reasons": list(dict.fromkeys(reasons + [
             "Indicators and strategies share the same price data; they are correlated, not "
             "independent confirmations."])),
@@ -355,8 +377,7 @@ def _explain(symbol: str, timeframe: str, regime: dict | None, trend: str, struc
         out.append("No strategy has all its conditions met in a compatible regime.")
     if prediction and prediction.get("probabilities"):
         p = prediction["probabilities"]
-        out.append(f"Model {prediction['model_name']}: UP {p['UP']:.0%}, SIDEWAYS "
-                   f"{p['SIDEWAYS']:.0%}, DOWN {p['DOWN']:.0%} "
+        out.append(f"Model {prediction['model_name']}: {_probs_text(p, ', ')} "
                    f"(uncertainty {prediction['uncertainty']:.2f}).")
     out.append("Decision: NO TRADE.")
     return out

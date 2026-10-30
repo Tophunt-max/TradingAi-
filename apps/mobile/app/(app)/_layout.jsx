@@ -29,7 +29,9 @@ const TITLES = {
   education: 'Learn & Grow',
   help: 'Help & Support',
   models: 'AI Model Lab',
+  'model-compare': 'Model Comparison',
   backtesting: 'Backtesting Lab',
+  events: 'Events & Calendar',
 };
 
 export default function AppLayout() {

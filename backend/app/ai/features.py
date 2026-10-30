@@ -20,7 +20,9 @@ FEATURE_NAMES = [
     "stoch_k", "body_pct", "upper_wick_pct", "lower_wick_pct", "time_of_day",
 ]
 CLASSES = ["DOWN", "SIDEWAYS", "UP"]
+BINARY_CLASSES = ["DOWN", "UP"]
 LABEL_ATR_MULT = 0.5
+TARGETS = ("three_class", "binary")
 
 
 def _rel(a: float | None, b: float | None) -> float | None:
@@ -74,14 +76,31 @@ def label(ctx: Ctx, t: int, horizon: int) -> int | None:
     return 1
 
 
-def dataset(ctx: Ctx, horizon: int) -> tuple[list[list[float]], list[int], list[int]]:
+def label_binary(ctx: Ctx, t: int, horizon: int) -> int | None:
+    """UP (1) if the close H bars ahead is above the current close, DOWN (0) if
+    below; exact ties are dropped (None)."""
+    if t + horizon >= len(ctx):
+        return None
+    move = ctx.c[t + horizon] - ctx.c[t]
+    return None if move == 0 else int(move > 0)
+
+
+def classes_for(target: str) -> list[str]:
+    return BINARY_CLASSES if target == "binary" else CLASSES
+
+
+def dataset(ctx: Ctx, horizon: int, target: str = "three_class"
+            ) -> tuple[list[list[float]], list[int], list[int]]:
     """(X, y, row index) for rows that have both features and a label."""
+    if target not in TARGETS:
+        raise ValueError(f"Unknown target {target!r}.")
+    lab = label_binary if target == "binary" else label
     xs, ys, idx = [], [], []
     for t in range(len(ctx)):
         x = row(ctx, t)
         if x is None:
             continue
-        y = label(ctx, t, horizon)
+        y = lab(ctx, t, horizon)
         if y is None:
             continue
         xs.append(x)
@@ -90,7 +109,27 @@ def dataset(ctx: Ctx, horizon: int) -> tuple[list[list[float]], list[int], list[
     return xs, ys, idx
 
 
-def label_definition(horizon: int, timeframe: str) -> str:
+def outcomes(ctx: Ctx, idx: list[int], horizon: int) -> dict[str, list[float | None]]:
+    """Realised forward quantities per labelled row (training targets only).
+
+    ret_pct: 100 × log(close[t+H] / close[t]).
+    vol_ratio: per-bar realised vol over bars t+1..t+H divided by the per-bar
+    realised vol of the 20 bars up to t (rv20 / sqrt(20)); None when undefined.
+    """
+    rets, ratios = [], []
+    for t in idx:
+        rets.append(100 * math.log(ctx.c[t + horizon] / ctx.c[t]))
+        fwd = [math.log(ctx.c[k] / ctx.c[k - 1]) for k in range(t + 1, t + horizon + 1)]
+        cur = ctx.s["rv20"][t]
+        fv = math.sqrt(sum(r * r for r in fwd) / len(fwd)) if fwd else None
+        ratios.append(fv / (cur / math.sqrt(20)) if fv is not None and cur else None)
+    return {"ret_pct": rets, "vol_ratio": ratios}
+
+
+def label_definition(horizon: int, timeframe: str, target: str = "three_class") -> str:
+    if target == "binary":
+        return (f"Close {horizon} × {timeframe} bars ahead vs. the current close: UP if higher, "
+                "DOWN if lower (ties dropped). No SIDEWAYS band.")
     return (f"Close {horizon} × {timeframe} bars ahead vs. the current close: UP if it rises "
             f"more than {LABEL_ATR_MULT} × ATR(14), DOWN if it falls more than that, otherwise "
             "SIDEWAYS.")

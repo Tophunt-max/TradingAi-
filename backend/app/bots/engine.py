@@ -25,6 +25,8 @@ from app.analysis import regime as R
 from app.bots import lifecycle
 from app.core.config import MarketDataMode, Settings
 from app.core.time import IST
+from app.learning import guard as learning_guard
+from app.learning import recorder as learning_recorder
 from app.market_data.provider import MarketDataProvider
 from app.models.bots import Bot, BotConfigVersion, BotRun, BotSignal, BotStatus, WorkerHeartbeat
 from app.models.execution import WorkerLease
@@ -132,7 +134,20 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
         mv = registry.serving(db, cfg.instrument.underlying, cfg.timeframe)
         if mv is None or r.quality.status == "FAIL":
             return None
+        if learning_guard.serving_block_reason(db, mv):
+            return None  # drift-DEGRADED models abstain
         return registry.predict(mv, ctx, r.source).get("probabilities")
+
+    def learn(outcome: str, reasons: list[str], order: Any = None) -> None:
+        # Learning hook: one decision record per (bot, bar), NO_SIGNAL included.
+        reg = R.detect(ctx)
+        learning_recorder.record_bot(
+            db, bot_id=bot.id, symbol=cfg.instrument.underlying, timeframe=cfg.timeframe,
+            candles=r.data, atr=ctx.s["atr14"][-1], quality=r.quality.status,
+            data_source=r.source, outcome=outcome, side=side,
+            regime=reg["label"] if reg else None, reasons=reasons,
+            account_mode=run.account_mode, order_id=getattr(order, "id", None),
+            position_id=getattr(order, "position_id", None), now=now)
 
     ev = Evaluator(ctx, side, probability)
     conds = [c.model_dump() for c in cfg.entry.conditions]
@@ -140,6 +155,7 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
     mets = [x["met"] is True for x in results]
     fired = bool(conds) and (all(mets) if cfg.entry.logic == "ALL" else any(mets))
     if not fired:
+        learn("NO_SIGNAL", ["Entry conditions not met on the last closed candle."])
         return "NO_SIGNAL"
 
     rs = risk_svc.get_or_create(db, bot.user_id)
@@ -149,6 +165,7 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
         lifecycle.event(db, bot, run, "WARN", "SUPPRESSED",
                         f"{side} conditions met at {price:.2f}, signal suppressed: {reason}",
                         bar_ts=bar_ts.isoformat(), conditions=results)
+        learn("SUPPRESSED", [reason])
         return "SUPPRESSED"
     reg = R.detect(ctx)
     sig = BotSignal(bot_id=bot.id, run_id=run.id, user_id=bot.user_id,
@@ -165,6 +182,7 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
         lifecycle.event(db, bot, run, "INFO", "SIGNAL",
                         f"{side} entry signal at {price:.2f}{note}. Signal-only: no order placed.",
                         bar_ts=bar_ts.isoformat(), conditions=results)
+        learn("SIGNAL", ["Signal-only run: no order placed."])
         return "SIGNAL"
     order = paper_entry_for_signal(db, settings, provider, bot, cfg, sig, now, run)
     if order.status == "REJECTED":
@@ -175,6 +193,7 @@ def evaluate_run(db: Session, provider: MarketDataProvider, run: BotRun, bot: Bo
         lifecycle.event(db, bot, run, "INFO", "ORDER",
                         f"{side} signal at {price:.2f}{note}; paper order {order.status.lower()}: "
                         f"BUY {order.quantity} {order.trading_symbol}.", order_id=str(order.id))
+    learn("SIGNAL", [], order)
     return "SIGNAL"
 
 

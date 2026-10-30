@@ -9,6 +9,7 @@ import { fixed, formatINR, formatIST, formatPrice } from '../../services/format'
 import { QualityBanner } from '../../features/market/QualityBanner';
 import { ORDER_TONE } from '../../features/portfolio/Lists';
 import { newIdempotencyKey, usePaperEntry } from '../../features/trading/api';
+import { OptionsIntelSection } from '../../features/ai/OptionsIntel';
 
 const fmtOI = (n) => (n == null ? '—' : Math.abs(n) >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : n.toLocaleString('en-IN'));
 const fmtStrike = (k) => (Number.isInteger(k) ? String(k) : fixed(k, 1));
@@ -193,6 +194,7 @@ export default function OptionChain() {
                     <SideDetail title="Call (CE)" side={selected.call} lotSize={d.lot_size} />
                     <SideDetail title="Put (PE)" side={selected.put} lotSize={d.lot_size} />
                   </View>
+                  <OptionsIntelSection key={`intel-${selected.strike}`} underlying={underlying} expiry={d.expiry} strike={selected.strike} />
                   <PaperBuy key={selected.strike} underlying={underlying} expiry={d.expiry} row={selected} lotSize={d.lot_size} source={d.source} onLeave={() => setSelected(null)} />
                   <Button title="Charges calculator" icon="calculator-outline" size="sm" variant="ghost" onPress={() => { setSelected(null); router.push({ pathname: '/charges', params: { buy: selected.call?.ask ?? '', qty: d.lot_size ?? '' } }); }} />
                   <NoticeBanner>

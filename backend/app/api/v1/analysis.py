@@ -10,9 +10,14 @@ from app.ai import registry
 from app.analysis import context as C
 from app.analysis import pipeline
 from app.analysis import regime as R
-from app.api.deps import DbDep
+from app.api.deps import DbDep, SettingsDep
 from app.api.v1.market import Provenance
 from app.core.errors import ServiceUnavailableError
+from app.core.time import utcnow
+from app.events import store as events_store
+from app.fundamentals import store as fundamentals_store
+from app.learning import guard as learning_guard
+from app.learning import recorder as learning_recorder
 from app.market_data.factory import ProviderDep, provider_errors
 from app.market_data.provider import OPTION_UNDERLYINGS
 
@@ -77,6 +82,34 @@ class AnalysisPayload(Provenance):
     explanation: list[str]
     technical: dict[str, Any] | None = None
     indicator_version: str | None = None
+    regime_v2: dict[str, Any] | None = None
+    strategy_router: dict[str, Any] | None = None
+    event_risk: dict[str, Any] | None = None
+    decision_record_id: str | None = None
+
+
+# Event-risk gate levels mapped onto the regime engine's event-context levels.
+_REGIME_EVENT_LEVEL = {"HIGH": "HIGH", "ELEVATED": "MEDIUM", "NONE": "NONE"}
+
+
+def _record_shadow(db: Any, sym: str, timeframe: str, ctx: C.Ctx, regime_label: str | None,
+                   r: Any) -> None:
+    """SHADOW models: record predictions for later validation; never shown or used."""
+    from sqlalchemy import select
+
+    from app.models.ml import ModelVersion
+
+    if r.quality.status == "FAIL":
+        return
+    for smv in db.scalars(select(ModelVersion).where(
+            ModelVersion.symbol == sym, ModelVersion.timeframe == timeframe,
+            ModelVersion.status == "SHADOW")).all():
+        try:
+            spred = registry.predict(smv, ctx, r.source)
+            registry.record(db, smv, ctx, spred, regime_label, r.source)
+        except Exception:  # a shadow model must never affect the live response
+            db.rollback()
+            logger.warning("shadow_prediction_failed", extra={"model_id": str(smv.id)})
 
 
 def _candles(provider: Any, symbol: str, timeframe: str, limit: int = WINDOW) -> Any:
@@ -92,6 +125,7 @@ def _candles(provider: Any, symbol: str, timeframe: str, limit: int = WINDOW) ->
 def analyse(
     provider: ProviderDep,
     db: DbDep,
+    settings: SettingsDep,
     symbol: Annotated[str, Path(max_length=32)],
     timeframe: Annotated[TF, Query()] = "15m",
 ) -> AnalysisPayload:
@@ -100,12 +134,18 @@ def analyse(
     mv = registry.serving(db, sym, timeframe)
 
     def predict_fn(ctx: C.Ctx, regime_label: str | None) -> dict[str, Any] | None:
+        _record_shadow(db, sym, timeframe, ctx, regime_label, r)
         if mv is None:
             return None
         if r.quality.status == "FAIL":
             return {"model_version": str(mv.id), "model_name": mv.name, "probabilities": None,
                     "reason": "Data-quality check failed, so the model abstains."}
-        pred = registry.predict(mv, ctx, r.source)
+        blocked = learning_guard.serving_block_reason(db, mv)
+        if blocked:
+            return {"model_version": str(mv.id), "model_name": mv.name,
+                    "horizon_bars": mv.horizon_bars, "probabilities": None, "reason": blocked}
+        pred = registry.predict(mv, ctx, r.source, quality=r.quality.status,
+                                regime=regime_label)
         registry.record(db, mv, ctx, pred, regime_label, r.source)
         return pred
 
@@ -119,11 +159,21 @@ def analyse(
             logger.warning("analysis_chain_unavailable", extra={"symbol": sym})
             return None
 
+    now = utcnow()
+    prof = fundamentals_store.profile(db, sym, now)
+    risk = events_store.gate_for(db, settings, sym, now, sym if sym in OPTION_UNDERLYINGS
+                                 else None, prof.sector if prof else None)
     out = pipeline.run(candles=r.data, timeframe=timeframe, symbol=sym,
                        quality=r.quality.as_dict(), is_demo=r.is_demo, predict_fn=predict_fn,
-                       chain_fn=chain_fn)
+                       chain_fn=chain_fn, event_risk_level=_REGIME_EVENT_LEVEL[risk["level"]],
+                       event_risk=risk)
     proxy = [n for n in r.notes if "proxy" in n]
     out["abstain_reasons"].extend(proxy)
+    rec = learning_recorder.record_analysis(db, symbol=sym, timeframe=timeframe, out=out,
+                                            candles=r.data, quality=r.quality.status,
+                                            data_source=r.source, now=now)
+    db.commit()
+    out["decision_record_id"] = str(rec.id) if rec else None
     return AnalysisPayload(**r.provenance(), symbol=sym, timeframe=timeframe, **out)
 
 

@@ -5,6 +5,7 @@ import { AppText, Badge, Card, CardHeader, KeyValue, ListRow } from '../../compo
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { fixed, formatINR, formatPrice } from '../../services/format';
 import { correlationNote, familyRows, patternContextLine, patternStatus } from './evidence';
+import { pct, regimeBars, routerRows, stateLabel } from './intel';
 
 export const BIAS_TONE = { BULLISH: 'positive', BEARISH: 'negative', NEUTRAL: 'neutral', SIDEWAYS: 'warning' };
 const STATUS_ICON = { DONE: ['checkmark-circle', 'positive'], SKIPPED: ['remove-circle-outline', 'textMuted'], FAILED: ['close-circle', 'negative'], BLOCKED: ['lock-closed', 'warning'] };
@@ -270,5 +271,62 @@ export function SetupCard({ setup, options }) {
       ) : null}
       <AppText variant="caption" tone="warning" style={{ marginTop: 6 }}>This is not a trade proposal. Any paper trade must still pass the charges check and the global risk manager.</AppText>
     </Card>
+  );
+}
+
+export function RegimeV2Card({ regime }) {
+  const theme = useTheme();
+  const bars = regimeBars(regime);
+  if (!regime) return null;
+  return (
+    <Card testID="regime-v2-card">
+      <CardHeader
+        title="Regime v2 confidence"
+        subtitle={`${regime.version ?? ''} · confidence scores are UNCALIBRATED (not probabilities)`}
+        right={<Badge label={stateLabel(regime.state)} tone={regime.no_trade ? 'negative' : 'info'} />}
+      />
+      <Badge label="UNCALIBRATED" tone="warning" testID="regime-v2-uncalibrated" />
+      <View style={{ gap: 6, marginTop: 8 }}>
+        {bars.map((b) => (
+          <View key={b.state} accessibilityLabel={`${b.label} ${pct(b.value, 0)}`}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <AppText variant="caption" tone={b.isTop ? 'default' : 'muted'} style={b.isTop ? { fontWeight: '700' } : undefined}>{b.label}</AppText>
+              <AppText variant="caption" tone="muted">{pct(b.value)}</AppText>
+            </View>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: theme.colors.surfaceRaised }}>
+              <View style={{ width: `${b.value * 100}%`, height: 6, borderRadius: 3, backgroundColor: b.isTop ? theme.colors.primary : theme.colors.textFaint }} />
+            </View>
+          </View>
+        ))}
+      </View>
+      {regime.reasons?.map((r) => <AppText key={r} variant="caption" tone="muted">• {r}</AppText>)}
+      {regime.unavailable?.length ? <AppText variant="caption" tone="faint">Unavailable inputs: {regime.unavailable.join(', ')}.</AppText> : null}
+    </Card>
+  );
+}
+
+export function RouterCard({ router }) {
+  const theme = useTheme();
+  const rows = routerRows(router);
+  if (!rows.length) return null;
+  return (
+    <Expandable
+      testID="router-card"
+      title="Strategy router v2"
+      subtitle={router.no_trade ? `NO TRADE: regime ${stateLabel(router.regime_state)}` : `Compatibility with ${stateLabel(router.regime_state)} (expected over regime confidence)`}
+      right={router.no_trade ? <Badge label="NO TRADE" tone="negative" /> : null}
+    >
+      {rows.map((s) => (
+        <View key={s.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: theme.colors.borderSubtle, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <AppText variant="bodyStrong" style={{ flex: 1 }}>{s.name}</AppText>
+            <AppText variant="caption" tone="muted">{s.score}</AppText>
+            <Badge label={s.verdictLabel} tone={s.tone} />
+          </View>
+          {s.reasons.map((r) => <AppText key={r} variant="caption" tone="muted">{r}</AppText>)}
+        </View>
+      ))}
+      <AppText variant="caption" tone="faint" style={{ marginTop: 4 }}>{router.note}</AppText>
+    </Expandable>
   );
 }

@@ -64,7 +64,7 @@ Train from the CLI:
 ```bash
 cd backend
 python -m app.ai.train NIFTY 15m --history 3000        # creates a CANDIDATE or REJECTED version
-python -m app.ai.train NIFTY 15m --promote             # promotes only if the gate passed
+python -m app.ai.train NIFTY 15m --shadow              # SHADOW only if offline criteria pass; promote via admin API
 ```
 With INDstocks, 3,000 × 15m candles is roughly 4–5 months of history, fetched in 7-day
 windows at no more than 5 requests/second.

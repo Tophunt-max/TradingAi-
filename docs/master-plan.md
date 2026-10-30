@@ -17,19 +17,19 @@ Status: ✅ done and tested · 🟡 partial · ⛔ blocked on something outside 
 | # | Package | Prompt refs | Status | Doc |
 |---|---|---|---|---|
 | A | Repo audit, merged plan | P2 Ph1, P3 Ph1 | ✅ | this file, [implementation-plan.md](implementation-plan.md) |
-| B | Account modes: accounts, demo ledger ₹10,000, reset, per-account isolation, mode switch | P2 §4, §23, P3 M15 | ⏳ | [accounts.md](accounts.md) |
-| C | Execution adapters + router (Paper / RealBroker), unauthorized live-order guards | P2 §4D, §16, P3 M11 | ⏳ | [execution.md](execution.md) |
-| D | Technical indicators v3 (SMA, EMA100, ROC, OBV, HV/RV, Ichimoku, volume MA, anchored VWAP, divergences, channels) + evidence groups | P3 M2 | ⏳ | [technical-analysis.md](technical-analysis.md) |
-| E | Candlestick intelligence (full pattern set + context metrics + outcome stats) | P3 M3 | ⏳ | same |
-| F | Price action / SMC v2 (equal highs/lows, displacement, supply/demand, failed breakout, premium/discount, detection vs confirmation timestamps) | P3 M4 | ⏳ | same |
-| G | Fundamentals (point-in-time statements, ratios, peers) | P3 M5 | ⏳ (engine; no licensed source) | [fundamentals-events.md](fundamentals-events.md) |
-| H | News and events (calendar, availability time, event-risk gate) | P3 M6 | ⏳ (engine; no licensed feed) | same |
-| I | Options intelligence (IV rank, target-before-stop, expected net, decay/spread risk) | P3 M7 | ⏳ | [options-intelligence.md](options-intelligence.md) |
-| J | Regime probabilities + strategy router v2 | P3 M8 | ⏳ | same / [ai-models.md](ai-models.md) |
-| K | Models: logistic, random forest, histogram gradient boosting, calibration, comparison | P3 M9 | ⏳ | [ai-models.md](ai-models.md) |
+| B | Account modes: accounts, demo ledger ₹10,000, reset, per-account isolation, mode switch | P2 §4, §23, P3 M15 | ✅ | [accounts.md](accounts.md) |
+| C | Execution adapters + router (Paper / RealBroker), unauthorized live-order guards | P2 §4D, §16, P3 M11 | ✅ | [execution.md](execution.md) |
+| D | Technical indicators v3 (SMA, EMA100, ROC, OBV, HV/RV, Ichimoku, volume MA, anchored VWAP, divergences, channels) + evidence groups | P3 M2 | ✅ | [technical-analysis.md](technical-analysis.md) |
+| E | Candlestick intelligence (full pattern set + context metrics + outcome stats) | P3 M3 | ✅ | same |
+| F | Price action / SMC v2 (equal highs/lows, displacement, supply/demand, failed breakout, premium/discount, detection vs confirmation timestamps) | P3 M4 | ✅ | same |
+| G | Fundamentals (point-in-time statements, ratios, peers) | P3 M5 | 🟡 engine done, no licensed source | [fundamentals-events.md](fundamentals-events.md) |
+| H | News and events (calendar, availability time, event-risk gate) | P3 M6 | 🟡 engine done, no licensed source | [fundamentals-events.md](fundamentals-events.md) |
+| I | Options intelligence (IV rank, target-before-stop, expected net, decay/spread risk) | P3 M7 | 🟡 IV rank always null (no IV history stored); no futures basis | [options-intelligence.md](options-intelligence.md) |
+| J | Regime probabilities + strategy router v2 | P3 M8 | 🟡 regime confidences are uncalibrated scores; no per-state strategy validation, so no strategy reaches COMPATIBLE | [ai-models.md](ai-models.md) |
+| K | Models: logistic, random forest, histogram gradient boosting, calibration, comparison | P3 M9 | ✅ | [ai-models.md](ai-models.md) |
 | L | Multi-factor decision engine (evidence, conflicts, NO TRADE reasons, proposal → risk manager) | P3 M10 | ⏳ | [decision-engine.md](decision-engine.md) |
-| M | Backtesting lab (event-driven, costs, walk-forward, Monte Carlo, regime reports) | P2 §19, P3 M14 | ⏳ | [backtesting.md](backtesting.md) |
-| N | Learning: outcome scoring, error attribution, drift, promotion/rollback | P2 §20, P3 M13 | ⏳ | [learning.md](learning.md) |
+| M | Backtesting lab (event-driven, costs, walk-forward, Monte Carlo, regime reports) | P2 §19, P3 M14 | ✅ | [backtesting.md](backtesting.md) |
+| N | Learning: outcome scoring, error attribution, drift, promotion/rollback | P2 §20, P3 M13 | 🟡 VOLATILITY_ERROR cannot fire (no predicted vol range recorded) | [learning.md](learning.md) |
 | O | AI Intelligence Dashboard, Backtesting Lab, Reports screens; mode shown everywhere | P2 §5, P3 M16 | ⏳ | [mobile.md](mobile.md) |
 | P | Real broker adapter (broker-neutral, one adapter, OAuth, sync, reconciliation), live locked | P2 §4B, §17, P3 Ph10 | ⏳ (⛔ no API credentials) | [broker-integration.md](broker-integration.md) |
 | Q | Reports, daily report, CSV, alerts | P2 §21 | ⏳ | [reports.md](reports.md) |

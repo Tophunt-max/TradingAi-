@@ -32,10 +32,24 @@ from app.models.execution import (
     WorkerLease,
 )
 from app.models.instruments import Instrument, InstrumentSync
+from app.models.intelligence import (
+    CompanyProfile,
+    CorporateAction,
+    DecisionRecord,
+    FundamentalReport,
+    MarketEvent,
+    ModelDriftReport,
+)
 from app.models.ml import ModelVersion, Prediction
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
+    "CompanyProfile",
+    "CorporateAction",
+    "DecisionRecord",
+    "FundamentalReport",
+    "MarketEvent",
+    "ModelDriftReport",
     "Account",
     "LedgerEntry",
     "LiveAuthorization",

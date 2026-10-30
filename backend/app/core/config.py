@@ -108,6 +108,15 @@ class Settings(BaseSettings):
     # The DEMO market never closes; set false to exercise session rules on DEMO data.
     demo_market_always_open: bool = True
 
+    # Fundamentals: the latest period older than this many days is flagged STALE.
+    fundamentals_stale_days: int = Field(default=150, ge=30, le=730)
+    # Event-risk gate window around an event's time (minutes).
+    event_risk_before_minutes: int = Field(default=120, ge=0, le=7 * 24 * 60)
+    event_risk_after_minutes: int = Field(default=60, ge=0, le=7 * 24 * 60)
+    # Learning: a fill this far (percent of the reference price) beyond the reference
+    # price is attributed as EXECUTION_SLIPPAGE.
+    learning_slippage_threshold_pct: float = Field(default=1.0, gt=0, le=50)
+
     # Verification-code delivery: "console" (development only) or "none".
     otp_delivery: str = "console"
 

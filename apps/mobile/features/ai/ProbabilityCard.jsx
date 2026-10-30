@@ -13,7 +13,7 @@ export function ProbabilityBars({ probabilities }) {
   const theme = useTheme();
   return (
     <View style={{ gap: 8 }} testID="probability-bars">
-      {ROWS.map(([k, tone]) => {
+      {ROWS.filter(([k]) => probabilities[k] != null).map(([k, tone]) => {
         const p = probabilities[k];
         return (
           <View key={k} style={{ gap: 4 }} accessibilityLabel={`${k} ${Math.round(p * 100)} percent`}>

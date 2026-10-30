@@ -6,6 +6,7 @@ import { CandleChart, IndicatorPanel } from '../../../components/charts/CandleCh
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { BIAS_TONE } from '../../../features/ai/Sections';
 import { patternContextLine, patternStatus } from '../../../features/ai/evidence';
+import { FundamentalsCard } from '../../../features/learning/Sections';
 import { useCandles, useQuotes } from '../../../features/market/api';
 import { QualityBanner } from '../../../features/market/QualityBanner';
 import { mapAnnotations } from '../../../features/market/annotations';
@@ -163,6 +164,7 @@ export default function Instrument() {
           </View>
         ) : null}
       </View>
+      <FundamentalsCard symbol={symbol} />
       <AppText variant="caption" tone="faint">
         Triangles mark patterns at the candle that completed them; UNCONFIRMED patterns still need a close beyond their high or low. AVWAP is anchored at the latest confirmed swing and starts only once that swing was confirmed. Shaded boxes are fair value gaps and order blocks until price trades back into them.
       </AppText>

@@ -5,6 +5,7 @@ import { AppText, Badge, Card, CardHeader, KeyValue, NoticeBanner, QueryState, S
 import { useTheme } from '../../components/theme/ThemeProvider';
 import { useModels, usePredictionHistory } from '../../features/market/api';
 import { formatIST } from '../../services/format';
+import { DecisionHistory, LearningOverview } from '../../features/learning/Sections';
 
 const STATUS_TONE = { PROMOTED: 'positive', CANDIDATE: 'info', REJECTED: 'negative', RETIRED: 'neutral' };
 
@@ -60,7 +61,7 @@ function History() {
               value={`↑${Math.round(p.p_up * 100)} ↔${Math.round(p.p_sideways * 100)} ↓${Math.round(p.p_down * 100)} · ${p.outcome ?? 'pending'}`}
             />
           ))}
-          <AppText variant="caption" tone="faint">Outcome scoring, drift monitoring and shadow testing arrive in Phase 8.</AppText>
+          <AppText variant="caption" tone="faint">Outcomes are scored by the learning worker after each horizon has elapsed.</AppText>
         </Card>
       )}
     </QueryState>
@@ -72,7 +73,7 @@ export default function Models() {
   const q = useModels();
   return (
     <Screen edges={['bottom']} refreshing={q.isRefetching} onRefresh={q.refetch}>
-      <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'MODELS', label: 'Model registry' }, { value: 'HISTORY', label: 'Prediction history' }]} />
+      <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'MODELS', label: 'Registry' }, { value: 'HISTORY', label: 'Predictions' }, { value: 'DECISIONS', label: 'Decisions' }, { value: 'LEARNING', label: 'Learning' }]} testID="model-lab-tabs" />
       {tab === 'MODELS' ? (
         <QueryState query={q}>
           {(rows) =>
@@ -83,11 +84,15 @@ export default function Models() {
             )
           }
         </QueryState>
-      ) : (
+      ) : tab === 'HISTORY' ? (
         <History />
+      ) : tab === 'DECISIONS' ? (
+        <DecisionHistory />
+      ) : (
+        <LearningOverview />
       )}
       <NoticeBanner tone="info">
-        Models are never retrained or promoted automatically. A candidate is promoted by an admin only after it beats the base-rate baseline out of sample, is calibrated and was trained on real data.
+        Models are never retrained or promoted automatically. A candidate needs to beat the base-rate baseline out of sample, be calibrated, be trained on real data and pass a SHADOW stage on live outcomes before an admin can promote it.
       </NoticeBanner>
     </Screen>
   );

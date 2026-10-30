@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, Button, Card, CardHeader, ChipRow, DataSourceBadge, ListRow, NoticeBanner, QueryState, Screen, Select } from '../../../components/ui';
 import { ProbabilityCard } from '../../../features/ai/ProbabilityCard';
-import { EvidenceCard, LevelsCard, MtfStrip, PatternsCard, PipelineCard, RegimeCard, SetupCard, SmcCard, StrategiesCard } from '../../../features/ai/Sections';
+import { EvidenceCard, LevelsCard, MtfStrip, PatternsCard, PipelineCard, RegimeCard, RegimeV2Card, RouterCard, SetupCard, SmcCard, StrategiesCard } from '../../../features/ai/Sections';
 import { useAnalysis, useMtf } from '../../../features/market/api';
 import { QualityBanner } from '../../../features/market/QualityBanner';
 import { FEATURES, featureHref } from '../../../features/roadmap';
@@ -51,6 +51,8 @@ export default function AiLab() {
             <PipelineCard steps={d.pipeline} reasons={d.abstain_reasons} explanation={d.explanation} />
             <ProbabilityCard prediction={d.prediction} />
             <RegimeCard regime={d.regime} trend={d.trend} />
+            <RegimeV2Card regime={d.regime_v2} />
+            <RouterCard router={d.strategy_router} />
             <MtfStrip data={mtf.data} />
             <SetupCard setup={d.setup_candidate} options={d.options} />
             <StrategiesCard strategies={d.strategies} />
@@ -67,6 +69,7 @@ export default function AiLab() {
         {['model-lab', 'backtesting'].map((id) => (
           <ListRow key={id} title={FEATURES[id].title} subtitle={FEATURES[id].route ? FEATURES[id].summary : `Phase ${FEATURES[id].phase} · not built yet`} icon={FEATURES[id].icon} onPress={() => router.push(featureHref(id))} />
         ))}
+        <ListRow title="Model Comparison" subtitle="Logistic vs random forest vs gradient boosting, out of sample" icon="podium-outline" onPress={() => router.push('/model-compare')} />
       </Card>
       {a.data?.is_demo ? <NoticeBanner tone="info">Analysis uses synthetic DEMO candles until an authorised data provider is connected.</NoticeBanner> : null}
     </Screen>

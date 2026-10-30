@@ -8,6 +8,7 @@ class-frequency (climatology) baseline. Parameters are stored as plain JSON
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -45,17 +46,23 @@ class Params:
         return cls(d["mean"], d["scale"], d["coef"], d["intercept"])
 
 
-def fit(X: np.ndarray, y: np.ndarray, seed: int = 0) -> Params:
-    if set(np.unique(y)) != {0, 1, 2}:
-        raise ValueError("Training data must contain all three classes.")
+def fit(X: np.ndarray, y: np.ndarray, seed: int = 0, n_classes: int = 3) -> Params:
+    if set(np.unique(y)) != set(range(n_classes)):
+        raise ValueError(f"Training data must contain all {n_classes} classes.")
     mean = X.mean(axis=0)
     scale = X.std(axis=0)
     scale[scale == 0] = 1.0
     clf = LogisticRegression(C=HYPERPARAMS["C"], max_iter=HYPERPARAMS["max_iter"],
                              random_state=seed)
     clf.fit((X - mean) / scale, y)
-    assert list(clf.classes_) == [0, 1, 2]
-    return Params(mean.tolist(), scale.tolist(), clf.coef_.tolist(), clf.intercept_.tolist())
+    assert list(clf.classes_) == list(range(n_classes))
+    coef, intercept = clf.coef_, clf.intercept_
+    if n_classes == 2:
+        # sklearn stores one row (logit of class 1). softmax([-z/2, z/2]) == sigmoid(z),
+        # so two symmetric rows reproduce it exactly with the shared softmax predictor.
+        coef = np.vstack([-coef[0] / 2, coef[0] / 2])
+        intercept = np.array([-intercept[0] / 2, intercept[0] / 2])
+    return Params(mean.tolist(), scale.tolist(), coef.tolist(), intercept.tolist())
 
 
 def predict_proba(p: Params, X: np.ndarray) -> np.ndarray:
@@ -92,13 +99,26 @@ def calibration(P: np.ndarray, y: np.ndarray, bins: int = 10) -> tuple[float, li
     return float(ece), curve
 
 
+FitPredict = Callable[[np.ndarray, np.ndarray, np.ndarray, int], np.ndarray]
+
+
+def _logistic_fit_predict(n_classes: int) -> FitPredict:
+    def fp(Xtr: np.ndarray, ytr: np.ndarray, Xte: np.ndarray, seed: int) -> np.ndarray:
+        return predict_proba(fit(Xtr, ytr, seed=seed, n_classes=n_classes), Xte)
+    return fp
+
+
 def walk_forward(X: np.ndarray, y: np.ndarray, horizon: int, folds: int = 5,
-                 initial_frac: float = 0.5) -> dict[str, Any]:
+                 initial_frac: float = 0.5, fit_predict: FitPredict | None = None,
+                 n_classes: int = 3) -> dict[str, Any]:
     """Expanding-window walk-forward with a purge gap of `horizon` rows.
 
     Training rows for a fold end `horizon` rows before the fold's first test
-    row, so no training label window overlaps a test row.
+    row, so no training label window overlaps a test row. `fit_predict`
+    (default: this module's logistic regression) receives only the fold's
+    training rows; any calibration split must be taken inside them.
     """
+    fit_predict = fit_predict or _logistic_fit_predict(n_classes)
     n = len(y)
     start = int(n * initial_frac)
     size = max((n - start) // folds, 1)
@@ -110,26 +130,27 @@ def walk_forward(X: np.ndarray, y: np.ndarray, horizon: int, folds: int = 5,
         if t1 <= t0 or train_end < 50:
             continue
         Xtr, ytr = X[:train_end], y[:train_end]
-        if set(np.unique(ytr)) != {0, 1, 2}:
+        if set(np.unique(ytr)) != set(range(n_classes)):
             continue
-        params = fit(Xtr, ytr, seed=k)
-        P = predict_proba(params, X[t0:t1])
-        prior = np.bincount(ytr, minlength=3) / len(ytr)
+        P = fit_predict(Xtr, ytr, X[t0:t1], k)
+        prior = np.bincount(ytr, minlength=n_classes) / len(ytr)
         B = np.tile(prior, (t1 - t0, 1))
         P_all.append(P)
         B_all.append(B)
         y_all.append(y[t0:t1])
         test_idx.extend(range(t0, t1))
         fold_info.append({"fold": k + 1, "train_rows": int(train_end), "test_rows": int(t1 - t0),
-                          "purge_rows": horizon})
+                          "purge_rows": horizon, "test_start": int(t0), "test_end": int(t1)})
     if not P_all:
         raise ValueError("Not enough data for walk-forward validation.")
     P, B, yy = np.vstack(P_all), np.vstack(B_all), np.concatenate(y_all)
     return {"P": P, "B": B, "y": yy, "test_idx": test_idx, "folds": fold_info}
 
 
-def evaluate(wf: dict[str, Any], regimes: list[str | None] | None = None) -> dict[str, Any]:
+def evaluate(wf: dict[str, Any], regimes: list[str | None] | None = None,
+             classes: list[str] | None = None) -> dict[str, Any]:
     P, B, y = wf["P"], wf["B"], wf["y"]
+    classes = classes or CLASSES
     ece, curve = calibration(P, y)
     metrics = {
         "oos_samples": int(len(y)),
@@ -139,7 +160,8 @@ def evaluate(wf: dict[str, Any], regimes: list[str | None] | None = None) -> dic
         "baseline_brier": round(brier(B, y), 5),
         "ece": round(ece, 5),
         "accuracy": round(float((P.argmax(axis=1) == y).mean()), 4),
-        "class_share": {CLASSES[i]: round(float((y == i).mean()), 4) for i in range(3)},
+        "class_share": {classes[i]: round(float((y == i).mean()), 4)
+                        for i in range(len(classes))},
         "calibration_curve": curve,
         "folds": wf["folds"],
     }
@@ -180,4 +202,39 @@ def gate(metrics: dict[str, Any], data_source: str) -> dict[str, Any]:
     add("data", "Trained on real market data", data_source != "DEMO",
         "Synthetic DEMO data can never promote a model." if data_source == "DEMO"
         else f"Source: {data_source}.")
+    vs = metrics.get("vs_logistic")
+    if vs is not None:  # challengers must beat the logistic baseline, not just climatology
+        add("beats_logistic", "Beats the logistic baseline (bootstrap CI)", vs["better"],
+            f"Mean log-loss difference {vs['mean_diff']:+.4f}, 95% CI "
+            f"[{vs['ci_low']:+.4f}, {vs['ci_high']:+.4f}] (need the upper bound < 0).")
     return {"passed": all(c["passed"] for c in checks), "checks": checks, "thresholds": GATE}
+
+
+# ------------------------------------------------------------- comparison
+
+
+def per_sample_log_loss(P: np.ndarray, y: np.ndarray) -> np.ndarray:
+    return -np.log(np.clip(P[np.arange(len(y)), y], EPS, 1))
+
+
+def block_bootstrap_diff(a: np.ndarray, b: np.ndarray, block: int, n_boot: int = 1000,
+                         seed: int = 0, alpha: float = 0.05) -> dict[str, Any]:
+    """Paired moving-block bootstrap of mean(a − b) for per-sample losses.
+
+    Blocks of consecutive predictions keep the serial dependence of
+    overlapping forecast horizons. "better" means the whole (1 − alpha) CI of
+    a − b lies below zero, i.e. `a` has lower loss than `b` beyond resampling
+    noise.
+    """
+    d = np.asarray(a, float) - np.asarray(b, float)
+    n = len(d)
+    block = int(max(1, min(block, n)))
+    rng = np.random.default_rng(seed)
+    k = int(math.ceil(n / block))
+    starts = rng.integers(0, n - block + 1, size=(n_boot, k))
+    idx = (starts[:, :, None] + np.arange(block)[None, None, :]).reshape(n_boot, -1)[:, :n]
+    means = d[idx].mean(axis=1)
+    lo, hi = np.quantile(means, [alpha / 2, 1 - alpha / 2])
+    return {"mean_diff": round(float(d.mean()), 5), "ci_low": round(float(lo), 5),
+            "ci_high": round(float(hi), 5), "n": int(n), "block": block, "n_boot": n_boot,
+            "confidence": 1 - alpha, "better": bool(hi < 0)}
