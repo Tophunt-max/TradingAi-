@@ -39,7 +39,7 @@ served at `http://localhost:8000/docs` in development and test only.
 | DELETE | `/users/me/sessions/{id}` | ✓ | Remote sign-out |
 | GET | `/users/me/audit-logs` | ✓ | Own audit history |
 | GET | `/admin/audit-logs` | admin | Filter by `user_id`, `action` |
-| GET | `/accounts` | ✓ | Active mode + DEMO and REAL accounts: status, balances (DEMO from the ledger, REAL `null`), availability and reasons. See [accounts.md](accounts.md) |
+| GET | `/accounts` | ✓ | Active mode + DEMO and REAL accounts: status, balances (DEMO from the ledger; REAL from the latest broker FUNDS snapshot, else `null`), `balances_source`, availability and reasons. See [accounts.md](accounts.md) |
 | POST | `/accounts/active` | ✓ | `{mode: DEMO\|REAL}`; never moves orders/positions. REAL → 409 `ACCOUNT_MODE_UNAVAILABLE`. Audited |
 | GET | `/accounts/demo/ledger?limit=&offset=` | ✓ | DEMO cash ledger, newest first |
 | POST | `/accounts/demo/reset` | ✓ | `{confirm: true}` (else 400 `CONFIRMATION_REQUIRED`): cancels demo orders, closes demo positions at the last price, restores ₹10,000, resets today's demo counters. Audited `account.demo_reset`. Never touches REAL |
@@ -73,6 +73,10 @@ served at `http://localhost:8000/docs` in development and test only.
 | GET | `/learning/summary?symbol=&timeframe=` | ✓ | Calibration table, Brier, log loss, ECE, accuracy by timeframe/regime/strategy, error-class counts, HYPOTHETICAL NO TRADE analysis, drift status |
 | GET | `/learning/drift` | ✓ | PSI and performance thresholds plus the latest drift report per SHADOW/PROMOTED model |
 | POST | `/admin/learning/run` | admin | One learning-worker pass (outcomes + due drift reports). Audited |
+| GET | `/decision/{NIFTY\|BANKNIFTY}?timeframe=5m\|15m\|1h&side=auto\|CE\|PE` | ✓ | Multi-factor `DecisionReport` for the ACTIVE account: `decision` `NO_TRADE\|WATCH\|TRADE_PROPOSAL`, directional view (promoted-model probabilities or `null` + reason), setup class, supporting / conflicting / ignored evidence, family votes and the `UNWEIGHTED_UNVALIDATED` combination, data-quality warnings, regime, event gate, fundamentals (context only), options candidate (four outputs), entry / invalidation conditions, stop and target (premium % + underlying level), sizing, expected net, read-only `risk_check` (dry run), `execution`, `proposal.paper_order_request` (TRADE_PROPOSAL only), `no_trade_reasons`, `watch_reasons`, `label` (`SIMULATED` on DEMO data), `decision_record_id`, `recorded` (`NEW` / `ALREADY_RECORDED_FOR_BAR`). Never places or reserves an order. See [decision-engine.md](decision-engine.md) |
+| GET | `/decision/weights/status?underlying=&timeframe=` | ✓ | Default rule, latest in-process weight fit (or `null`) and when learned weights may be used |
+| POST | `/decision/admin/weights/fit?underlying=&timeframe=` | admin | Fits family weights (logistic regression, purged walk-forward) and compares them with the unweighted rule out of sample; `usable` is false on DEMO data or failed validation. Stored in process memory only. Audited |
+| GET | `/intelligence/dashboard?underlying=NIFTY\|BANKNIFTY&timeframe=` | ✓ | AI Intelligence Dashboard: `regime`, `models`, `forecast`, `calibration`, `prediction_history`, `strategy_performance`, `backtests`, `account_results`, `risk`, `data_freshness`, `broker`, `drift`, `error_attribution`, `no_trade`; each `{status: OK\|NO_DATA\|UNAVAILABLE, source, data, reason, ...labels}`. Account sections use the active account only (`account_mode`, `label` `DEMO_VIRTUAL\|REAL`) |
 | GET | `/bots/strategies` | ✓ | Strategy catalogue / templates |
 | POST | `/bots/ai-draft` | ✓ | Rule-based draft bounded by global risk limits |
 | GET/POST | `/bots` | ✓ | List (filter `status`, `account_mode` defaulting to the active mode) / create a draft. `config.account_mode` is DEMO (default) or REAL |
@@ -95,8 +99,16 @@ served at `http://localhost:8000/docs` in development and test only.
 | GET | `/trades.csv` | ✓ | Closed trades of one account (IST times, `account_mode` column) |
 | GET | `/portfolio/charges?day=` | ✓ | Charges breakdown from fills |
 | POST | `/charges/estimate` | ✓ | `{buy_price, sell_price, quantity, trade_date?}` → breakdown, net P&L, break-even |
-| GET | `/alerts?category=` | ✓ | From your audit trail, bot signals/errors, paper fills/rejections and loss/profit lock hits |
-| GET | `/brokers` | ✓ | Paper adapter + planned brokers (none integrated) |
+| GET | `/alerts?category=` | ✓ | From your audit trail, bot signals/errors, paper fills/rejections, loss/profit lock hits, daily report ready, broker connected/disconnected/connection failed/sync failed |
+| GET | `/brokers` | ✓ | Paper, INDstocks (capabilities, `verification: UNVERIFIED_AGAINST_LIVE_API`, `enabled`, your `connection`) and planned brokers (`NOT_INTEGRATED`). `supports_live_orders` is always false. See [broker-integration.md](broker-integration.md) |
+| GET | `/brokers/permissions` | ✓ | Live-activation checklist `{ready, checks[{key,label,passed,detail}], blockers}`; never ready in this build |
+| POST | `/brokers/{broker}/connect` | ✓ | `{token}` (TOKEN_PASTE). Validated read-only, stored encrypted, never returned; creates/links the REAL account (no opening balance). 409 `BROKER_NOT_ENABLED`/`BROKER_NOT_INTEGRATED`/`BROKER_ALREADY_CONNECTED`, 400 `BROKER_TOKEN_REJECTED`, 503 `BROKER_ENCRYPTION_UNAVAILABLE`/`BROKER_UNAVAILABLE`. Audited |
+| POST | `/brokers/{broker}/disconnect` | ✓ | `{confirm: true}`; deletes the token, REAL account `DISCONNECTED`; `broker_revoke: NOT_SUPPORTED` for INDstocks. Audited |
+| POST | `/brokers/{broker}/sync` | ✓ | Funds/positions/orders/fills → snapshots (all or nothing) + charges reconciliation for today. 409 `BROKER_NOT_CONNECTED`/`BROKER_TOKEN_EXPIRED`, 503 `BROKER_UNAVAILABLE`. Audited |
+| GET | `/brokers/{broker}/health` | ✓ | Local state, then a read-only broker call when connected; sets `EXPIRED`/`ERROR` |
+| GET | `/reports/daily?day=&account_mode=` | ✓ | Daily report of one account (IST day): totals, charges breakdown, slippage, by bot/strategy/exit reason, risk events, trades, mode label. See [reports.md](reports.md) |
+| GET | `/reports/pnl?from=&to=&account_mode=` | ✓ | Daily net series, cumulative, drawdown, by weekday/instrument/exit reason (≤ 366 days) |
+| GET | `/reports/{orders\|fills\|ledger\|daily-report\|trades}.csv?account_mode=` | ✓ | IST timestamps, `account_mode` column; `ledger.csv` DEMO only (409 `LEDGER_DEMO_ONLY`); `daily-report.csv?from=&to=` ≤ 92 days |
 | GET | `/market/provider-status` | ✓ | Provider health, instrument-sync times, price-feed heartbeat |
 | POST | `/admin/market-data/sync-instruments` | admin | Download the INDstocks instrument master |
 | GET | `/backtests/strategies` | ✓ | Catalogue strategies with `backtestable`, `reason`, default conditions (CE and PE) and tunable params (stop %, target %, threshold) |

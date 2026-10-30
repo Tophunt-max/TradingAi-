@@ -35,6 +35,10 @@ export default function AiLab() {
 
   return (
     <Screen title="AI Market Analysis" subtitle="Regime, structure, strategies and calibrated probabilities" refreshing={a.isRefetching} onRefresh={a.refetch}>
+      <Card testID="ai-intelligence-entry">
+        <ListRow title="AI Intelligence" subtitle="Regime, models, calibration, risk usage and NO TRADE reasons" icon="pulse-outline" onPress={() => router.push('/intelligence')} testID="open-intelligence" />
+        <ListRow title="Decision Report" subtitle="Multi-factor evidence, gates and proposal (never auto-executed)" icon="document-text-outline" onPress={() => router.push(`/decision?underlying=${group === 'BANKNIFTY' ? 'BANKNIFTY' : 'NIFTY'}&timeframe=${tf === '1d' ? '15m' : tf}`)} testID="open-decision" />
+      </Card>
       <ChipRow value={group} onChange={setGroup} options={[{ value: 'NIFTY', label: 'NIFTY' }, { value: 'BANKNIFTY', label: 'BANKNIFTY' }, { value: 'STOCKS', label: 'STOCKS' }]} testIDPrefix="ai-group" />
       {group === 'STOCKS' ? <Select label="Stock" value={stock} onChange={setStock} options={STOCKS.map((s) => ({ value: s, label: s }))} /> : null}
       <ChipRow value={tf} onChange={setTf} options={['5m', '15m', '1h', '1d'].map((v) => ({ value: v, label: v.toUpperCase() }))} testIDPrefix="ai-tf" />

@@ -60,8 +60,11 @@ A cash ledger. Amounts are signed `Decimal`s; `balance_after` is the running bal
   rather than both writing a balance computed from the same stale entry. Writes also happen
   under the per-user risk lock.
 
-REAL accounts have no ledger. Their cash/available/equity are `null` until a broker balance
-snapshot exists, and the pre-trade funds check fails closed for them.
+REAL accounts have no ledger. Their balances come from the latest broker FUNDS snapshot
+(`cash` = start-of-day balance, `available_funds` = option-buying balance, `equity` stays
+`null`), labelled with `balances_source` and `fetched_at`; without a snapshot they are `null`.
+The pre-trade funds check still fails closed for them. See
+[broker-integration.md](broker-integration.md).
 
 ## Isolation guarantees and how each is enforced
 
@@ -139,7 +142,8 @@ Decisions:
 
 ## Limitations
 
-- No REAL account can be created through the API; only tests insert REAL rows.
-- No broker balance snapshots exist yet, so REAL balances are always `null`.
+- A REAL account is created only by connecting a broker (`POST /brokers/{broker}/connect`),
+  with no opening balance; disconnecting sets it `DISCONNECTED`.
+- REAL balances are only as fresh as the last broker sync.
 - Bot signals are not yet stamped with an account; the per-mode daily signal count joins
   through `bot_runs.account_mode`.

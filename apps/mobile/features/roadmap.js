@@ -11,8 +11,9 @@ export const FEATURES = {
   education: { title: 'Learn & Grow', icon: 'school-outline', phase: 4, route: '/education', summary: 'Strategies, indicators, risk and glossary.' },
   backtesting: { title: 'Backtesting Lab', icon: 'time-outline', phase: 8, route: '/backtesting', summary: 'Event-driven backtests, walk-forward tests and Monte Carlo analysis without lookahead.' },
   'model-lab': { title: 'AI Model Lab', icon: 'git-network-outline', phase: 4, route: '/models', summary: 'Model registry, walk-forward metrics, promotion gate and prediction history.' },
+  intelligence: { title: 'AI Intelligence', icon: 'pulse-outline', phase: 9, route: '/intelligence', summary: 'Regime, models, calibration, risk usage, data freshness and NO TRADE reasons in one place.' },
   events: { title: 'Events & Calendar', icon: 'calendar-outline', phase: 8, route: '/events', summary: 'Imported events, option expiries, holidays and event-risk status.' },
-  reports: { title: 'Reports', icon: 'document-text-outline', phase: 8, summary: 'Daily and weekly performance, charges, slippage and CSV export.' },
+  reports: { title: 'Reports', icon: 'document-text-outline', phase: 8, route: '/reports', summary: 'Daily report, P&L analytics, charges, slippage and CSV export.' },
   'ai-analysis': { title: 'AI Market Analysis', icon: 'sparkles-outline', phase: 4, route: '/ai-lab', summary: 'Probabilities with calibration, uncertainty and NO TRADE.' },
   'bot-builder': { title: 'Bot Builder', icon: 'construct-outline', phase: 5, route: '/bots', summary: 'AI Auto Create, manual builder and templates.' },
   portfolio: { title: 'Portfolio & P&L', icon: 'pie-chart-outline', phase: 6, route: '/portfolio', summary: 'Demo (virtual) and real P&L, kept separate, with charges.' },
@@ -21,7 +22,7 @@ export const FEATURES = {
 
 export const MORE_SECTIONS = [
   { title: 'Trading', items: ['option-chain', 'orders', 'positions', 'screener', 'risk-center'] },
-  { title: 'Research', items: ['backtesting', 'model-lab', 'events', 'reports', 'education'] },
+  { title: 'Research', items: ['intelligence', 'backtesting', 'model-lab', 'events', 'reports', 'education'] },
   { title: 'Connections', items: ['alerts', 'brokers'] },
 ];
 

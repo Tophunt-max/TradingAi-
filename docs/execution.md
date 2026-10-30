@@ -26,10 +26,11 @@ carrying every blocking reason), `AdapterAccountMismatch` (a routing bug; never 
 - **`PaperExecutionAdapter`** (`brokers/paper.py`, alias `PaperBroker`): the simulator for DEMO
   accounts. Bid/ask fills with slippage, spread and liquidity rules, optional partial fills. Its
   books (`paper_broker_orders/fills`) are scoped by account and CHECKed to DEMO.
-- **`RealBrokerExecutionAdapter`** (`brokers/real.py`): broker-neutral wrapper over a
-  `BrokerClient` protocol (`place`, `cancel`, `get`, `find_by_client_id`, `health`) that a
-  specific broker integration will implement later using its official API. No client exists;
-  `UnavailableBrokerClient` raises `BrokerUnavailable` on every call and reports unhealthy.
+- **`RealBrokerExecutionAdapter`** (`brokers/real.py`): broker-neutral wrapper over the
+  `BrokerClient` protocol (`brokers/client.py`). The router gives it the client bound to the
+  account's broker connection (INDstocks, unverified against the live API); without a usable
+  connection it gets `UnavailableBrokerClient`, which raises `BrokerUnavailable` on every call
+  and reports unhealthy. See [broker-integration.md](broker-integration.md).
 
 ## Router (`backend/app/execution/router.py`)
 
@@ -53,9 +54,10 @@ accounts are skipped and counted (`real_skipped`) because there is no broker to 
 2. The account is REAL (a DEMO account is refused when the adapter is built).
 3. The account status is `ACTIVE`.
 4. An unrevoked `live_authorizations` row exists for this user and account.
-5. The broker client reports healthy.
+5. The broker client reports healthy (connection CONNECTED, token unexpired; no network call).
 
-The same reasons feed the pre-trade risk manager's first check (`account`), so a REAL entry
+`modify` runs the same guards. The pre-trade risk manager also has a REAL-only `broker`
+check, so a disconnected or erroring broker blocks new REAL entries. The same reasons feed the pre-trade risk manager's first check (`account`), so a REAL entry
 is rejected with an explanation even before the adapter is called. The API refuses REAL
 manual entries, exits and cancels with 409 `LIVE_TRADING_LOCKED`, and REAL bots cannot start
 (409 `LIVE_TRADING_LOCKED`; the bot validation also fails its `account_mode` check).

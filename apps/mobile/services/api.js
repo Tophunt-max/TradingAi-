@@ -22,7 +22,7 @@ export class ApiError extends Error {
 export function createApiClient({ baseUrl = API_URL, fetchImpl = globalThis.fetch, tokens, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
   let refreshing = null; // single-flight refresh promise
 
-  async function rawRequest(path, { method = 'GET', body, auth = true, headers = {}, signal } = {}) {
+  async function rawRequest(path, { method = 'GET', body, auth = true, headers = {}, signal, responseType = 'json' } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     if (signal) signal.addEventListener?.('abort', () => controller.abort());
@@ -50,6 +50,8 @@ export function createApiClient({ baseUrl = API_URL, fetchImpl = globalThis.fetc
     }
 
     if (res.status === 204) return { res, data: null };
+    // Text bodies (CSV exports) are read as text; errors still use the JSON envelope.
+    if (responseType === 'text' && res.ok) return { res, data: await res.text() };
     let data = null;
     try {
       data = await res.json();
@@ -107,6 +109,7 @@ export function createApiClient({ baseUrl = API_URL, fetchImpl = globalThis.fetc
   return {
     request,
     get: (path, opts) => request(path, { ...opts, method: 'GET' }),
+    getText: (path, opts) => request(path, { ...opts, method: 'GET', responseType: 'text' }),
     post: (path, body, opts) => request(path, { ...opts, method: 'POST', body }),
     patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body }),
     del: (path, opts) => request(path, { ...opts, method: 'DELETE' }),

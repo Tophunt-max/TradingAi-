@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../store/auth';
 
 // Everything that is scoped to the active account on the backend.
-const ACCOUNT_SCOPED = ['accounts', 'demo-ledger', 'portfolio', 'orders', 'order', 'positions', 'risk', 'bots', 'bot', 'alerts'];
+const ACCOUNT_SCOPED = ['accounts', 'demo-ledger', 'portfolio', 'orders', 'order', 'positions', 'risk', 'bots', 'bot', 'alerts', 'intelligence', 'decision'];
 
 export function invalidateAccountScoped(qc) {
   ACCOUNT_SCOPED.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { AppText, Button, Card, CardHeader, KeyValue, NoticeBanner, PnLText, Screen, TextField } from '../../components/ui';
+import { ActiveModeHeader } from '../../features/account/ActiveModeBadge';
 import { useChargesEstimate } from '../../features/trading/api';
 import { formatINR } from '../../services/format';
 
@@ -25,6 +26,7 @@ export default function ChargesCalculator() {
 
   return (
     <Screen edges={['bottom']}>
+      <ActiveModeHeader note="Estimates use the paper brokerage setting; real charges come from broker contract notes." />
       <Card>
         <CardHeader title="Option buy → sell" subtitle="NSE index options, intraday" />
         <TextField label="Buy premium (₹)" value={buy} onChangeText={setBuy} keyboardType="decimal-pad" testID="charges-buy" />

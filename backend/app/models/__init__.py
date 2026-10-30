@@ -21,6 +21,7 @@ from app.models.bots import (
     TradingMode,
     WorkerHeartbeat,
 )
+from app.models.brokers import BrokerChargeReconciliation, BrokerConnection, BrokerSnapshot
 from app.models.execution import (
     DailyRiskState,
     Fill,
@@ -41,9 +42,14 @@ from app.models.intelligence import (
     ModelDriftReport,
 )
 from app.models.ml import ModelVersion, Prediction
+from app.models.reports import DailyReport
 from app.models.user import User, UserPreferences, UserRole
 
 __all__ = [
+    "BrokerChargeReconciliation",
+    "BrokerConnection",
+    "BrokerSnapshot",
+    "DailyReport",
     "CompanyProfile",
     "CorporateAction",
     "DecisionRecord",

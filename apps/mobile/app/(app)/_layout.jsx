@@ -32,6 +32,9 @@ const TITLES = {
   'model-compare': 'Model Comparison',
   backtesting: 'Backtesting Lab',
   events: 'Events & Calendar',
+  reports: 'Reports',
+  intelligence: 'AI Intelligence',
+  decision: 'Decision Report',
 };
 
 export default function AppLayout() {

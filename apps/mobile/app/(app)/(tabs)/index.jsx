@@ -3,8 +3,9 @@ import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountModeBadge, AccountModeSelector, AppText, Badge, Button, Card, CardHeader, KeyValue, ListRow, QuickAction, Screen, StatTile } from '../../../components/ui';
+import { AccountModeSelector, AppText, Badge, Button, Card, CardHeader, KeyValue, ListRow, QuickAction, Screen, StatTile } from '../../../components/ui';
 import { useAccountMode } from '../../../features/account/mode';
+import { ActiveModeBadge, accountSubtitle } from '../../../features/account/ActiveModeBadge';
 import { useTheme } from '../../../components/theme/ThemeProvider';
 import { BrandMark } from '../../../features/auth/BrandMark';
 import { IndexHeroCards } from '../../../features/market/IndexHeroCards';
@@ -62,11 +63,12 @@ function InsightCard() {
 function PerformanceCard() {
   const p = usePortfolio();
   const d = p.data;
+  const { mode } = useAccountMode();
   return (
     <Card testID="performance-card">
-      <CardHeader title="Today's Performance" subtitle="Demo account · virtual funds" right={<AccountModeBadge mode="DEMO" />} />
+      <CardHeader title="Today's Performance" subtitle={accountSubtitle(mode)} right={<ActiveModeBadge />} />
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-        <StatTile label="Virtual balance" value={d ? formatINR(d.available_funds) : '—'} sub={d ? `Capital ${formatINR(d.capital)}` : undefined} />
+        <StatTile label={mode === 'REAL' ? 'Available funds' : 'Virtual balance'} value={d ? formatINR(d.available_funds) : '—'} sub={d ? `Capital ${formatINR(d.capital)}` : undefined} />
         <StatTile label="Today's P&L" value={d ? formatINR(d.realized_pnl_today) : '—'} sub={d ? `Total net ${formatINR(d.total_net_pnl)}` : undefined} />
         <StatTile label="Trades" value={d ? `${d.trades_today} / ${d.max_entries_per_day}` : '—'} sub={d ? `Open positions ${d.open_positions}` : undefined} />
       </View>

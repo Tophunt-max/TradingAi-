@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { AppText, Button, Card, CardHeader, ChipRow, NoticeBanner, QueryState, Screen, SegmentedControl, StateView, TextField } from '../../components/ui';
+import { ActiveModeHeader } from '../../features/account/ActiveModeBadge';
 import { useBacktestStrategies, useMonteCarlo, useRunBacktest, useWalkForward } from '../../features/backtesting/api';
 import { buildRunRequest, DEFAULT_FORM } from '../../features/backtesting/format';
 import { BacktestResults, WalkForwardSummary } from '../../features/backtesting/Results';
@@ -68,6 +69,7 @@ export default function Backtesting() {
 
   return (
     <Screen edges={['bottom']} keyboard>
+      <ActiveModeHeader note="Backtests are simulations: they never place orders in either account." />
       <NoticeBanner tone="warning" icon="flask-outline">
         Backtests replay closed candles bar by bar with costs, slippage and your global risk limits. The configured data source has no historical option premiums, so results are an underlying proxy, not an options backtest.
       </NoticeBanner>

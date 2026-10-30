@@ -1,7 +1,9 @@
 # INDstocks (INDmoney) market data
 
 QuantAI F&O reads market data from the official INDstocks API ([api-docs.indstocks.com](https://api-docs.indstocks.com/)).
-This integration is **read-only**. It never places, modifies or cancels orders.
+This integration is **read-only**. It never places, modifies or cancels orders. The separate,
+read-only broker connection (funds, positions, orders, fills of a user's own INDstocks
+account; orders locked) is described in [broker-integration.md](broker-integration.md).
 
 ## Status
 

@@ -193,6 +193,18 @@ def main() -> int:
             shot("06b-model-lab")
             page.go_back()
 
+            # AI Intelligence dashboard -> Decision Report (proposals are never auto-executed).
+            page.get_by_test_id("open-intelligence").click()
+            expect(page.get_by_test_id("intel-section-regime")).to_be_visible(timeout=20_000)
+            shot("06c-intelligence")
+            page.get_by_test_id("open-decision-report").click()
+            expect(page.locator("[data-testid^='decision-badge-']").first).to_be_visible(
+                timeout=30_000)
+            print("DECISION:", page.get_by_test_id("decision-summary").inner_text()[:120])
+            shot("06d-decision-report")
+            page.go_back()
+            page.go_back()
+
             # AI Auto Create -> saved draft -> validation blocks activation.
             page.get_by_role("tab", name="Bots").click()
             page.get_by_test_id("create-bot").click()

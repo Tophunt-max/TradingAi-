@@ -1,7 +1,8 @@
-"""Alerts feed and broker connection status.
+"""Alerts feed.
 
-Alerts are derived from the user's own records (audit trail, bot signals and errors,
-paper orders and daily risk state), so every item is real.
+Alerts are derived from the user's own records (audit trail incl. broker connection events,
+bot signals and errors, orders, daily risk state and persisted daily reports), so every
+item is real. Broker connection endpoints live in brokers.py.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from app.api.deps import AuthDep, DbDep
 from app.models.audit import AuditLog
 from app.models.bots import Bot, BotEvent, BotRun, BotSignal
 from app.models.execution import DailyRiskState, Order
+from app.models.reports import DailyReport
 
 router = APIRouter(tags=["alerts"])
 
@@ -40,6 +42,9 @@ _MAP: dict[str, tuple[Category, str, str]] = {
     "risk.limits_updated": ("RISK", "Risk limits changed", "warning"),
     "risk.kill_switch_engaged": ("RISK", "Kill switch engaged", "critical"),
     "risk.kill_switch_released": ("RISK", "Kill switch released", "warning"),
+    "broker.connect": ("SYSTEM", "Broker connected (read-only)", "info"),
+    "broker.disconnect": ("SYSTEM", "Broker disconnected", "warning"),
+    "broker.sync": ("SYSTEM", "Broker sync failed", "warning"),
 }
 
 
@@ -72,14 +77,23 @@ def alerts(
     for r in rows:
         if r.action == "auth.session_created" and r.outcome != "SUCCESS":
             continue
+        if r.action == "broker.sync" and r.outcome == "SUCCESS":
+            continue  # only failed syncs are worth an alert
         cat, title, sev = _MAP[r.action]
         if r.action.startswith("bot.") and r.outcome == "REJECTED":
             title, sev = f"{title.split(' (')[0]} rejected by activation checks", "warning"
+        if r.action in ("broker.connect", "broker.disconnect") and r.outcome == "REJECTED":
+            title = ("Broker connection failed" if r.action == "broker.connect"
+                     else "Broker disconnect failed")
+            sev = "warning"
         if category and cat != category:
             continue
         body = None
         if r.details.get("name"):
             body = str(r.details["name"])
+        elif r.action.startswith("broker."):
+            body = str(r.details.get("broker", "")) + (
+                f" · {r.details['code']}" if r.details.get("code") else "")
         elif r.ip_address:
             body = f"From {r.ip_address}"
         out.append(AlertOut(id=str(r.id), category=cat, severity=sev, title=title, body=body,
@@ -145,33 +159,16 @@ def alerts(
                                     body=f"Net {ds.realized_net:.2f} on {ds.trading_day}. "
                                          "New entries blocked; open positions keep SL/target.",
                                     created_at=ds.profit_lock_hit_at))
+    if category in (None, "SYSTEM"):
+        for rep in db.scalars(select(DailyReport).where(DailyReport.user_id == ctx.user.id,
+                                                        DailyReport.account_mode == active)
+                              .order_by(DailyReport.day.desc()).limit(10)).all():
+            t = rep.payload.get("totals", {})
+            out.append(AlertOut(
+                id=f"report-{rep.id}", category="SYSTEM", severity="info",
+                title=f"Daily report ready: {rep.day.isoformat()}",
+                body=f"{rep.payload.get('mode_label', rep.account_mode)}: "
+                     f"{t.get('trades', 0)} trade(s), net {t.get('net', '0')}.",
+                created_at=rep.generated_at))
     out.sort(key=lambda a: a.created_at, reverse=True)
     return out[:limit]
-
-
-class BrokerOut(BaseModel):
-    id: str
-    name: str
-    kind: Literal["PAPER", "BROKER"]
-    status: Literal["CONNECTED", "NOT_INTEGRATED"]
-    supports_live_orders: bool
-    note: str
-    last_sync: datetime | None
-
-
-@router.get("/brokers", response_model=list[BrokerOut])
-def brokers(_: AuthDep) -> list[BrokerOut]:
-    pending = ("No verified adapter yet. Integration is Phase 7 and uses only the broker's "
-               "official API.")
-    return [
-        BrokerOut(id="paper", name="Paper Trading", kind="PAPER", status="CONNECTED",
-                  supports_live_orders=False,
-                  note="Simulated account (default): bid/ask fills, slippage and charges.",
-                  last_sync=None),
-        *[
-            BrokerOut(id=i, name=n, kind="BROKER", status="NOT_INTEGRATED",
-                      supports_live_orders=False, note=pending, last_sync=None)
-            for i, n in (("zerodha", "Zerodha Kite Connect"), ("angelone", "Angel One SmartAPI"),
-                         ("upstox", "Upstox API"), ("dhan", "Dhan HQ API"))
-        ],
-    ]

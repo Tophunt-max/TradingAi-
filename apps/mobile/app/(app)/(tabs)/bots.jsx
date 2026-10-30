@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { Fab, NoticeBanner, QueryState, Screen, SegmentedControl, StateView } from '../../../components/ui';
+import { ActiveModeHeader } from '../../../features/account/ActiveModeBadge';
 import { BotCard } from '../../../features/bots/BotCard';
 import { useBots } from '../../../features/trading/api';
 
@@ -14,6 +15,7 @@ export default function Bots() {
   const setTab = setPicked;
   return (
     <Screen title="My Bots" subtitle="All bots share one global risk budget" refreshing={bots.isRefetching} onRefresh={bots.refetch}>
+      <ActiveModeHeader note="Bots trade only in the DEMO account while live trading is locked." />
       <SegmentedControl
         value={tab}
         onChange={setTab}

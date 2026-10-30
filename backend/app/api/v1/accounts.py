@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
@@ -41,6 +41,8 @@ class AccountOut(BaseModel):
     last_reset_at: datetime | None
     created_at: datetime | None
     note: str
+    # Where the balances come from: DEMO_LEDGER, or BROKER_SNAPSHOT with fetched_at.
+    balances_source: dict[str, Any] | None = None
 
 
 class AccountsOut(BaseModel):

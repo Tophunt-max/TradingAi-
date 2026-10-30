@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { AppText, BottomSheet, Button, Card, CardHeader, ConfirmDialog, KeyValue, NoticeBanner, ProgressRing, QueryState, Screen, TextField, ToggleRow } from '../../components/ui';
+import { ActiveModeHeader } from '../../features/account/ActiveModeBadge';
 import { describeError } from '../../features/auth/api';
 import { useKillSwitch, useRisk, useUpdateRiskLimits } from '../../features/trading/api';
 import { useHaptics } from '../../hooks/useHaptics';
@@ -58,6 +59,7 @@ export default function RiskCenter() {
 
   return (
     <Screen edges={['bottom']} refreshing={risk.isRefetching} onRefresh={risk.refetch}>
+      <ActiveModeHeader note="Limits are shared by both modes; usage below is this account's only." />
       <QueryState query={risk}>
         {(r) => {
           const l = r.limits;

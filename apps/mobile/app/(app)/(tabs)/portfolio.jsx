@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { AccountModeBadge, AppText, Button, Card, CardHeader, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile } from '../../../components/ui';
+import { AppText, Button, Card, CardHeader, KeyValue, NoticeBanner, QueryState, Screen, SegmentedControl, StatTile } from '../../../components/ui';
+import { ActiveModeBadge, accountSubtitle } from '../../../features/account/ActiveModeBadge';
+import { useAccountMode } from '../../../features/account/mode';
 import { OrdersList, PositionCard, PositionsList } from '../../../features/portfolio/Lists';
 import { usePortfolio, usePositions } from '../../../features/trading/api';
 import { formatINR } from '../../../services/format';
@@ -22,12 +24,13 @@ function OpenPositions() {
 
 function Summary() {
   const q = usePortfolio();
+  const { mode } = useAccountMode();
   return (
     <QueryState query={q}>
       {(p) => (
         <>
           <Card testID="portfolio-summary">
-            <CardHeader title="Total P&L" subtitle="Demo account · virtual funds · net of charges" right={<AccountModeBadge mode="DEMO" />} />
+            <CardHeader title="Total P&L" subtitle={accountSubtitle(mode, 'net of charges')} right={<ActiveModeBadge />} />
             <AppText variant="display" tone={Number(p.total_net_pnl) > 0 ? 'positive' : Number(p.total_net_pnl) < 0 ? 'negative' : 'default'}>
               {formatINR(p.total_net_pnl)}
             </AppText>

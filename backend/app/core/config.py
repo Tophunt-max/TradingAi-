@@ -120,8 +120,29 @@ class Settings(BaseSettings):
     # Verification-code delivery: "console" (development only) or "none".
     otp_delivery: str = "console"
 
+    # Broker connections (docs/broker-integration.md). Read-only connect/sync for the
+    # INDstocks broker adapter; it is UNVERIFIED against the live API, so it is off unless
+    # explicitly enabled. Order placement stays locked by LIVE_TRADING_ENABLED regardless.
+    broker_indstocks_enabled: bool = False
+    # Product used for F&O orders if live trading is ever enabled (INDstocks DERIVATIVE
+    # segment accepts MARGIN or INTRADAY).
+    broker_indstocks_product: str = "INTRADAY"
+    # Fernet key (urlsafe base64, 32 bytes) for broker tokens at rest. When unset, a key is
+    # derived from SECRET_KEY with HKDF (development/test only; required elsewhere when a
+    # broker integration is enabled). Rotating it makes stored tokens unreadable.
+    broker_token_encryption_key: SecretStr | None = None
+
+    # Optional Telegram notifier (docs/reports.md). Disabled unless both are set. Only
+    # non-sensitive text is sent: never tokens or broker details, never REAL amounts.
+    telegram_bot_token: SecretStr | None = None
+    telegram_chat_id: str | None = None
+    telegram_api_base: str = "https://api.telegram.org"
+    # The chat is server-wide, so only these users' reports are announced (comma-separated
+    # emails). Empty = nobody.
+    telegram_user_emails: Annotated[list[str], NoDecode] = []
+
     @field_validator("cors_origins", "indstocks_data_user_emails", "market_holidays",
-                     mode="before")
+                     "telegram_user_emails", mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:
         if isinstance(v, str):
@@ -150,6 +171,11 @@ class Settings(BaseSettings):
                 and not self.indstocks_access_token):
             raise ValueError(
                 "INDSTOCKS_ACCESS_TOKEN is required when MARKET_DATA_MODE=INDSTOCKS.")
+        if self.broker_indstocks_product not in ("INTRADAY", "MARGIN"):
+            raise ValueError("BROKER_INDSTOCKS_PRODUCT must be INTRADAY or MARGIN.")
+        if hardened and self.broker_indstocks_enabled and not self.broker_token_encryption_key:
+            raise ValueError("BROKER_TOKEN_ENCRYPTION_KEY must be set outside development/test "
+                             "when a broker integration is enabled.")
         if hardened and self.bot_worker_embedded:
             raise ValueError("BOT_WORKER_EMBEDDED is for development only; run the worker "
                              "as its own process.")

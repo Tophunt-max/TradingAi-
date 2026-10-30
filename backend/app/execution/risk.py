@@ -149,7 +149,38 @@ def pretrade(db: Session, settings: Settings, rs: RiskSettings, *, account: Acco
              bot_id: uuid.UUID | None = None, bot_risk_per_trade: Decimal | None = None,
              bot_square_off: str | None = None,
              account_blockers: list[str] | None = None) -> Decision:
-    ds = daily_state(db, account, trading_day(now))
+    return _evaluate(db, settings, rs, daily_state(db, account, trading_day(now)),
+                     account=account, now=now, lots=lots, lot_size=lot_size,
+                     entry_price=entry_price, stop_price=stop_price,
+                     round_trip_charges=round_trip_charges, buy_charges=buy_charges,
+                     quote_ok=quote_ok, quote_detail=quote_detail, expiry=expiry,
+                     bot_id=bot_id, bot_risk_per_trade=bot_risk_per_trade,
+                     bot_square_off=bot_square_off, account_blockers=account_blockers)
+
+
+def pretrade_dry_run(db: Session, settings: Settings, rs: RiskSettings, *, account: Account,
+                     now: datetime, lots: int, lot_size: int, entry_price: Decimal,
+                     stop_price: Decimal, round_trip_charges: Decimal, buy_charges: Decimal,
+                     quote_ok: bool, quote_detail: str, expiry: date,
+                     account_blockers: list[str] | None = None) -> Decision:
+    """The same checks as `pretrade`, read-only: no lock, no daily-state row is created, no
+    order or reservation exists afterwards. Used by the decision engine to tell the user
+    whether a proposal would pass now; the real `pretrade` re-checks at order time."""
+    return _evaluate(db, settings, rs, peek_daily_state(db, account, trading_day(now)),
+                     account=account, now=now, lots=lots, lot_size=lot_size,
+                     entry_price=entry_price, stop_price=stop_price,
+                     round_trip_charges=round_trip_charges, buy_charges=buy_charges,
+                     quote_ok=quote_ok, quote_detail=quote_detail, expiry=expiry,
+                     account_blockers=account_blockers)
+
+
+def _evaluate(db: Session, settings: Settings, rs: RiskSettings, ds: DailyRiskState, *,
+              account: Account, now: datetime, lots: int, lot_size: int,
+              entry_price: Decimal, stop_price: Decimal, round_trip_charges: Decimal,
+              buy_charges: Decimal, quote_ok: bool, quote_detail: str, expiry: date,
+              bot_id: uuid.UUID | None = None, bot_risk_per_trade: Decimal | None = None,
+              bot_square_off: str | None = None,
+              account_blockers: list[str] | None = None) -> Decision:
     pos = open_positions(db, account.id)
     pend = pending_entries(db, account.id)
     acct = funds(db, account)
@@ -211,6 +242,11 @@ def pretrade(db: Session, settings: Settings, rs: RiskSettings, *, account: Acco
          "The contract expires before the square-off time."),
         ("data", "Fresh, valid quote", quote_ok, quote_detail),
     ]
+    if account.mode == "REAL":  # REAL entries also need a healthy broker connection
+        from app.brokers.connections import connection_for_account, connection_health
+
+        bh = connection_health(connection_for_account(db, account), now)
+        checks.insert(1, ("broker", "Broker connection healthy", bh["ok"], bh["detail"]))
     out = Decision(allowed=True)
     for key, label, ok, why in checks:
         out.checks.append({"key": key, "label": label, "passed": bool(ok),

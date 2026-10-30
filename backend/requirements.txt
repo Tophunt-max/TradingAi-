@@ -9,6 +9,7 @@ psycopg[binary]==3.3.6
 redis==8.1.0
 argon2-cffi==25.1.0
 pyjwt==2.15.1
+cryptography==50.0.2
 websockets==17.3
 numpy==2.5.4
 scikit-learn==1.9.1

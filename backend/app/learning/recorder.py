@@ -105,3 +105,39 @@ def record_bot(db: Session, *, bot_id: uuid.UUID, symbol: str, timeframe: str,
         evidence={}, plan={"side": side} if side and decision != "NO_TRADE" else None,
         order_id=order_id, position_id=position_id, account_mode=account_mode)
     return _save(db, rec)
+
+
+def record_decision(db: Session, *, report: dict[str, Any], candles: list[dict[str, Any]],
+                    quality: str, data_source: str, atr: float | None,
+                    regime: str | None, now: datetime | None = None) -> DecisionRecord | None:
+    """A decision-engine report (TRADE_PROPOSAL / WATCH / NO_TRADE). One per bar, account
+    mode and requested side: origin DECISION, origin_ref '<mode>:<side>'."""
+    view = report.get("directional_view") or {}
+    probs = view.get("probabilities")
+    mv_id = view.get("model_version")
+    side = report.get("side")
+    rec = DecisionRecord(
+        origin="DECISION", origin_ref=f"{report['account_mode']}:{report['requested_side']}",
+        decision_ts=now or utcnow(), bar_ts=candles[-1]["ts"], symbol=report["symbol"],
+        timeframe=report["timeframe"], horizon_bars=DEFAULT_HORIZON.get(report["timeframe"], 4),
+        close=Decimal(str(candles[-1]["close"])), atr=atr,
+        model_version_id=uuid.UUID(mv_id) if mv_id and probs else None,
+        model_name=None, feature_version=_feature_version() if mv_id and probs else None,
+        indicator_version=None, data_quality=quality, data_source=data_source, regime=regime,
+        regime_probabilities=(report.get("regime") or {}).get("confidence"),
+        probabilities=probs, uncertainty=None,
+        calibration_status="CALIBRATED_OOS" if probs else "NOT_APPLICABLE",
+        predicted_direction=_direction(probs, side) if side else None,
+        decision=report["decision"],
+        no_trade_reasons=(report.get("no_trade_reasons", [])
+                          + report.get("watch_reasons", []))[:20],
+        strategies=[],
+        evidence={"setup": (report.get("setup") or {}).get("classification"),
+                  "votes": (report.get("evidence") or {}).get("votes"),
+                  "weights": ((report.get("evidence") or {}).get("combination") or {})
+                  .get("weights")},
+        plan={"side": side, "sizing": report.get("sizing"),
+              "proposal": report.get("proposal")} if side else None,
+        event_risk=(report.get("event_risk") or {}).get("level"),
+        account_mode=report["account_mode"])
+    return _save(db, rec)

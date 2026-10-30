@@ -3592,36 +3592,6 @@
         }
       }
     },
-    "/api/v1/brokers": {
-      "get": {
-        "tags": [
-          "alerts"
-        ],
-        "summary": "Brokers",
-        "operationId": "brokers_api_v1_brokers_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/BrokerOut"
-                  },
-                  "type": "array",
-                  "title": "Response Brokers Api V1 Brokers Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/models": {
       "get": {
         "tags": [
@@ -5098,6 +5068,1066 @@
           }
         ]
       }
+    },
+    "/api/v1/decision/{underlying}": {
+      "get": {
+        "tags": [
+          "decision"
+        ],
+        "summary": "Decision Report",
+        "operationId": "decision_report_api_v1_decision__underlying__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "underlying",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "NIFTY",
+                "BANKNIFTY"
+              ],
+              "type": "string",
+              "title": "Underlying"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "5m",
+                "15m",
+                "1h"
+              ],
+              "type": "string",
+              "default": "15m",
+              "title": "Timeframe"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "auto",
+                "CE",
+                "PE"
+              ],
+              "type": "string",
+              "default": "auto",
+              "title": "Side"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/decision/weights/status": {
+      "get": {
+        "tags": [
+          "decision"
+        ],
+        "summary": "Weights Status",
+        "operationId": "weights_status_api_v1_decision_weights_status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "underlying",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "NIFTY",
+                "BANKNIFTY"
+              ],
+              "type": "string",
+              "default": "NIFTY",
+              "title": "Underlying"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "5m",
+                "15m",
+                "1h"
+              ],
+              "type": "string",
+              "default": "15m",
+              "title": "Timeframe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Weights Status Api V1 Decision Weights Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/decision/admin/weights/fit": {
+      "post": {
+        "tags": [
+          "decision"
+        ],
+        "summary": "Fit Weights",
+        "operationId": "fit_weights_api_v1_decision_admin_weights_fit_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "underlying",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "NIFTY",
+                "BANKNIFTY"
+              ],
+              "type": "string",
+              "default": "NIFTY",
+              "title": "Underlying"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "5m",
+                "15m",
+                "1h"
+              ],
+              "type": "string",
+              "default": "15m",
+              "title": "Timeframe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Fit Weights Api V1 Decision Admin Weights Fit Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/intelligence/dashboard": {
+      "get": {
+        "tags": [
+          "intelligence"
+        ],
+        "summary": "Dashboard",
+        "operationId": "dashboard_api_v1_intelligence_dashboard_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "underlying",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "NIFTY",
+                "BANKNIFTY"
+              ],
+              "type": "string",
+              "default": "NIFTY",
+              "title": "Underlying"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "5m",
+                "15m",
+                "1h"
+              ],
+              "type": "string",
+              "default": "15m",
+              "title": "Timeframe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Dashboard Api V1 Intelligence Dashboard Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/brokers": {
+      "get": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Brokers",
+        "operationId": "brokers_api_v1_brokers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BrokerOut"
+                  },
+                  "type": "array",
+                  "title": "Response Brokers Api V1 Brokers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/brokers/permissions": {
+      "get": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Permissions",
+        "operationId": "permissions_api_v1_brokers_permissions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionsOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/brokers/{broker}/connect": {
+      "post": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Connect",
+        "operationId": "connect_api_v1_brokers__broker__connect_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "broker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Broker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/brokers/{broker}/disconnect": {
+      "post": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Disconnect",
+        "operationId": "disconnect_api_v1_brokers__broker__disconnect_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "broker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Broker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisconnectIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Disconnect Api V1 Brokers  Broker  Disconnect Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/brokers/{broker}/sync": {
+      "post": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_api_v1_brokers__broker__sync_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "broker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Broker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Sync Api V1 Brokers  Broker  Sync Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/brokers/{broker}/health": {
+      "get": {
+        "tags": [
+          "brokers"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_brokers__broker__health_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "broker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Broker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Health Api V1 Brokers  Broker  Health Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/daily": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Daily",
+        "operationId": "daily_api_v1_reports_daily_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST trading day; defaults to today.",
+              "title": "Day"
+            },
+            "description": "IST trading day; defaults to today."
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Daily Api V1 Reports Daily Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/pnl": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Pnl",
+        "operationId": "pnl_api_v1_reports_pnl_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Pnl Api V1 Reports Pnl Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/orders.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Orders Csv",
+        "operationId": "orders_csv_api_v1_reports_orders_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/fills.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Fills Csv",
+        "operationId": "fills_csv_api_v1_reports_fills_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/ledger.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Ledger Csv",
+        "operationId": "ledger_csv_api_v1_reports_ledger_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/daily-report.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Daily Report Csv",
+        "operationId": "daily_report_csv_api_v1_reports_daily_report_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/trades.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Trades Csv",
+        "description": "Same rows and columns as GET /trades.csv (kept for compatibility).",
+        "operationId": "trades_csv_api_v1_reports_trades_csv_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEMO",
+                    "REAL"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Account to report on; defaults to the active mode.",
+              "title": "Account Mode"
+            },
+            "description": "Account to report on; defaults to the active mode."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5257,6 +6287,18 @@
           "note": {
             "type": "string",
             "title": "Note"
+          },
+          "balances_source": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balances Source"
           }
         },
         "type": "object",
@@ -7155,7 +8197,12 @@
             "type": "string",
             "enum": [
               "CONNECTED",
-              "NOT_INTEGRATED"
+              "NOT_INTEGRATED",
+              "NOT_CONNECTED",
+              "NOT_ENABLED",
+              "EXPIRED",
+              "REVOKED",
+              "ERROR"
             ],
             "title": "Status"
           },
@@ -7178,6 +8225,66 @@
               }
             ],
             "title": "Last Sync"
+          },
+          "verification": {
+            "type": "string",
+            "title": "Verification"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "auth_flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Flow"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "docs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs Url"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources",
+            "default": []
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7188,7 +8295,9 @@
           "status",
           "supports_live_orders",
           "note",
-          "last_sync"
+          "last_sync",
+          "verification",
+          "enabled"
         ],
         "title": "BrokerOut"
       },
@@ -7982,6 +9091,129 @@
         ],
         "title": "Condition"
       },
+      "ConnectIn": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "password",
+            "title": "Token",
+            "description": "Access token generated at the broker. Stored encrypted on the server; never returned.",
+            "writeOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "ConnectIn"
+      },
+      "ConnectionOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "CONNECTED",
+              "EXPIRED",
+              "REVOKED",
+              "ERROR"
+            ],
+            "title": "Status"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "auth_flow": {
+            "type": "string",
+            "title": "Auth Flow"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          },
+          "token_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Expires At"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "connected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Connected At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "account_id",
+          "auth_flow",
+          "scopes",
+          "token_expires_at",
+          "last_sync_at",
+          "last_checked_at",
+          "last_error",
+          "connected_at",
+          "revoked_at"
+        ],
+        "title": "ConnectionOut"
+      },
       "CostsIn": {
         "properties": {
           "spread_bps": {
@@ -8473,6 +9705,183 @@
         ],
         "title": "DecisionOut"
       },
+      "DecisionReport": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "LIVE",
+              "DELAYED"
+            ],
+            "title": "Source"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "is_demo": {
+            "type": "boolean",
+            "title": "Is Demo"
+          },
+          "is_live": {
+            "type": "boolean",
+            "title": "Is Live"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "disclaimer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe"
+          },
+          "account_mode": {
+            "type": "string",
+            "enum": [
+              "DEMO",
+              "REAL"
+            ],
+            "title": "Account Mode"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "NO_TRADE",
+              "WATCH",
+              "TRADE_PROPOSAL"
+            ],
+            "title": "Decision"
+          },
+          "requested_side": {
+            "type": "string",
+            "title": "Requested Side"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "no_trade_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "No Trade Reasons"
+          },
+          "watch_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Watch Reasons"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposal"
+          },
+          "execution": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Execution"
+          },
+          "decision_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Record Id"
+          },
+          "recorded": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "source",
+          "provider",
+          "is_demo",
+          "is_live",
+          "as_of",
+          "disclaimer",
+          "quality",
+          "notes",
+          "version",
+          "symbol",
+          "timeframe",
+          "account_mode",
+          "label",
+          "decision",
+          "requested_side",
+          "side",
+          "no_trade_reasons",
+          "watch_reasons",
+          "proposal",
+          "execution"
+        ],
+        "title": "DecisionReport"
+      },
       "DemoReset": {
         "properties": {
           "confirm": {
@@ -8513,6 +9922,17 @@
           "reset_count"
         ],
         "title": "DemoResetOut"
+      },
+      "DisconnectIn": {
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "DisconnectIn"
       },
       "EntrySpec": {
         "properties": {
@@ -11455,6 +12875,87 @@
           "limitations"
         ],
         "title": "PatternStatsPayload"
+      },
+      "PermissionCheck": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "passed",
+          "detail"
+        ],
+        "title": "PermissionCheck"
+      },
+      "PermissionsOut": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "live_trading_enabled": {
+            "type": "boolean",
+            "title": "Live Trading Enabled"
+          },
+          "broker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready",
+          "live_trading_enabled",
+          "broker",
+          "checks",
+          "blockers"
+        ],
+        "title": "PermissionsOut"
       },
       "PipelineStep": {
         "properties": {

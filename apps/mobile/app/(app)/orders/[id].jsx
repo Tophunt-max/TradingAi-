@@ -45,7 +45,7 @@ export default function OrderDetail() {
           <>
             <Card testID="order-detail">
               <CardHeader title={o.instrument} subtitle={`${o.side} · ${o.purpose === 'EXIT' ? `exit (${exitLabel(o.exit_reason)})` : 'entry'} · ${o.order_type}`} right={<Badge label={o.status.replace('_', ' ')} tone={ORDER_TONE[o.status]} testID="order-status" />} />
-              <SourceBadges dataSource={o.data_source} lotSource={o.lot_size_source} />
+              <SourceBadges mode={o.account_mode} dataSource={o.data_source} lotSource={o.lot_size_source} />
               <KeyValue label="Quantity" value={`${o.quantity} (${o.lots} lot${o.lots === 1 ? '' : 's'} × ${o.lot_size})`} />
               <KeyValue label="Filled" value={`${o.filled_qty} / ${o.quantity}`} />
               <KeyValue label="Avg fill" value={o.avg_fill_price ? `₹${fixed(o.avg_fill_price)}` : '—'} />

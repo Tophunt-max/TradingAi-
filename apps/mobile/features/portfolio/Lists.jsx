@@ -31,10 +31,10 @@ const EXIT_LABEL = {
 export const exitLabel = (r) => EXIT_LABEL[r] ?? r ?? '—';
 
 /** DEMO trades use a placeholder lot of 1 unit; say so wherever quantity is shown. */
-export function SourceBadges({ dataSource, lotSource }) {
+export function SourceBadges({ mode, dataSource, lotSource }) {
   return (
     <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
-      <AccountModeBadge mode="DEMO" />
+      <AccountModeBadge mode={mode ?? 'DEMO'} />
       <DataSourceBadge source={dataSource} />
       {lotSource === 'DEMO_PLACEHOLDER' ? <Badge label="PLACEHOLDER LOT" tone="warning" /> : null}
     </View>
@@ -102,7 +102,7 @@ export function PositionCard({ p }) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <View style={{ flex: 1, gap: 4 }}>
           <AppText variant="bodyStrong">{p.instrument}</AppText>
-          <SourceBadges dataSource={p.data_source} />
+          <SourceBadges mode={p.account_mode} dataSource={p.data_source} />
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <PnLText value={pnl} prefix="₹" variant="bodyStrong" />

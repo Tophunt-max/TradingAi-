@@ -27,12 +27,12 @@ Status: ✅ done and tested · 🟡 partial · ⛔ blocked on something outside 
 | I | Options intelligence (IV rank, target-before-stop, expected net, decay/spread risk) | P3 M7 | 🟡 IV rank always null (no IV history stored); no futures basis | [options-intelligence.md](options-intelligence.md) |
 | J | Regime probabilities + strategy router v2 | P3 M8 | 🟡 regime confidences are uncalibrated scores; no per-state strategy validation, so no strategy reaches COMPATIBLE | [ai-models.md](ai-models.md) |
 | K | Models: logistic, random forest, histogram gradient boosting, calibration, comparison | P3 M9 | ✅ | [ai-models.md](ai-models.md) |
-| L | Multi-factor decision engine (evidence, conflicts, NO TRADE reasons, proposal → risk manager) | P3 M10 | ⏳ | [decision-engine.md](decision-engine.md) |
+| L | Multi-factor decision engine (evidence, conflicts, NO TRADE reasons, proposal → risk manager) | P3 M10 | ✅ unweighted family vote by default; learned weights fitted and validated but never used on DEMO data | [decision-engine.md](decision-engine.md) |
 | M | Backtesting lab (event-driven, costs, walk-forward, Monte Carlo, regime reports) | P2 §19, P3 M14 | ✅ | [backtesting.md](backtesting.md) |
 | N | Learning: outcome scoring, error attribution, drift, promotion/rollback | P2 §20, P3 M13 | 🟡 VOLATILITY_ERROR cannot fire (no predicted vol range recorded) | [learning.md](learning.md) |
-| O | AI Intelligence Dashboard, Backtesting Lab, Reports screens; mode shown everywhere | P2 §5, P3 M16 | ⏳ | [mobile.md](mobile.md) |
-| P | Real broker adapter (broker-neutral, one adapter, OAuth, sync, reconciliation), live locked | P2 §4B, §17, P3 Ph10 | ⏳ (⛔ no API credentials) | [broker-integration.md](broker-integration.md) |
-| Q | Reports, daily report, CSV, alerts | P2 §21 | ⏳ | [reports.md](reports.md) |
+| O | AI Intelligence Dashboard, Backtesting Lab, Reports screens; mode shown everywhere | P2 §5, P3 M16 | 🟡 dashboard, decision report and active-mode badges done; Reports screens belong to Q; backtests are not persisted, so the dashboard links to the lab | [mobile.md](mobile.md) |
+| P | Real broker adapter (broker-neutral, one adapter, OAuth, sync, reconciliation), live locked | P2 §4B, §17, P3 Ph10 | 🟡 interface, INDstocks adapter (token paste, from official docs), encrypted connections, sync snapshots, reconciliation, permissions checklist done and tested on a fake; ⛔ unverified against the live API (no token), live trading locked by design | [broker-integration.md](broker-integration.md) |
+| Q | Reports, daily report, CSV, alerts | P2 §21 | ✅ daily report, P&L analytics, CSV exports, stored reports + worker, report/broker alerts, optional Telegram; native CSV export needs a file-sharing module (web only) | [reports.md](reports.md) |
 | R | Security, regression, performance tests; deployment docs | P2 Ph9, P3 M17 | ⏳ | [security-testing.md](security-testing.md), [deployment.md](deployment.md) |
 
 ## Things this repository cannot do by itself

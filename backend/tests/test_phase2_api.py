@@ -201,7 +201,13 @@ def test_brokers_never_claim_live_support(client, h):
     rows = client.get("/api/v1/brokers", headers=h).json()
     assert rows[0]["id"] == "paper" and rows[0]["status"] == "CONNECTED"
     assert all(not b["supports_live_orders"] for b in rows)
-    assert all(b["status"] == "NOT_INTEGRATED" for b in rows[1:])
+    by_id = {b["id"]: b for b in rows}
+    # INDstocks has an adapter (unverified against the live API, disabled by default);
+    # every other broker is listed as not integrated.
+    assert by_id["indstocks"]["status"] == "NOT_ENABLED"
+    assert by_id["indstocks"]["verification"] == "UNVERIFIED_AGAINST_LIVE_API"
+    assert all(b["status"] == "NOT_INTEGRATED" for b in rows if b["id"] not in
+               ("paper", "indstocks"))
 
 
 def test_phase2_endpoints_require_auth(client):

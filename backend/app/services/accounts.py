@@ -54,7 +54,7 @@ def summary(db: Session, settings: Settings, user_id: uuid.UUID, mode: str) -> d
         "used_premium": None, "unrealized_pnl": None, "realized_pnl_total": None,
         "reset_count": acc.reset_count if acc else 0,
         "last_reset_at": acc.last_reset_at if acc else None,
-        "created_at": acc.created_at if acc else None,
+        "created_at": acc.created_at if acc else None, "balances_source": None,
     }
     if acc is None:
         out["note"] = "Not connected. Real balances come only from a verified broker."
@@ -66,11 +66,54 @@ def summary(db: Session, settings: Settings, user_id: uuid.UUID, mode: str) -> d
                    used_premium=f["used_margin"], unrealized_pnl=f["unrealized"],
                    realized_pnl_total=f["realized_net_total"],
                    note="Virtual money. Simulated fills, charges and P&L; never mixed with "
-                        "real results.")
+                        "real results.",
+                   balances_source={"source": "DEMO_LEDGER", "broker": "PAPER",
+                                    "fetched_at": None})
     else:
-        out.update(realized_pnl_total=f["realized_net_total"],
-                   note="No broker balance snapshot is available.")
+        out.update(realized_pnl_total=f["realized_net_total"], **real_balances(db, acc))
     return out
+
+
+def real_balances(db: Session, acc: Account) -> dict[str, Any]:
+    """REAL balances come only from the latest broker FUNDS snapshot (never a ledger).
+
+    cash = the broker's start-of-day balance, available_funds = its option-buying balance,
+    unrealized_pnl = its unrealised P&L. Equity is not reported by the broker, so it stays
+    null rather than being derived. Every value is labelled with source and fetched_at."""
+    from app.brokers.connections import latest_snapshot
+
+    snap = latest_snapshot(db, acc.id, "FUNDS")
+    if snap is None:
+        return {"note": "No broker balance snapshot is available. Sync the broker.",
+                "balances_source": None}
+    p = snap.payload or {}
+
+    def dec(key: str) -> Decimal | None:
+        return D(p[key]) if p.get(key) not in (None, "None") else None
+
+    return {"cash": dec("start_of_day_balance"), "available_funds": dec("available_option_buy"),
+            "unrealized_pnl": dec("unrealized_pnl"),
+            "note": f"Broker-reported funds ({snap.broker}) as of the last sync. Not live.",
+            "balances_source": {"source": "BROKER_SNAPSHOT", "broker": snap.broker,
+                                "fetched_at": snap.fetched_at,
+                                "fields": {"cash": "start_of_day_balance",
+                                           "available_funds": "available_option_buy",
+                                           "unrealized_pnl": "unrealized_pnl"},
+                                "broker_realized_pnl": p.get("realized_pnl")}}
+
+
+def link_real_account(db: Session, user_id: uuid.UUID, broker: str) -> Account:
+    """Create (or re-activate) the user's REAL account for a broker connection. A REAL row
+    never carries an opening balance (DB CHECK), and no ledger entry is ever posted."""
+    acc = ACC.get_account(db, user_id, "REAL")
+    if acc is None:
+        acc = Account(user_id=user_id, mode="REAL", status="ACTIVE", broker=broker[:20],
+                      opening_balance=None, reset_count=0, created_at=utcnow())
+        db.add(acc)
+        db.flush()
+        return acc
+    acc.status, acc.broker = "ACTIVE", broker[:20]
+    return acc
 
 
 def _prefs(db: Session, user_id: uuid.UUID) -> UserPreferences:
