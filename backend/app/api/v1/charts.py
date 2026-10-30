@@ -14,6 +14,7 @@ from app.api.v1.market import Provenance
 from app.core.errors import AppError
 from app.indicators import core as ind
 from app.market_data.factory import ProviderDep, provider_errors
+from app.schemas.common import SYMBOL_PATTERN
 
 router = APIRouter(prefix="/charts", tags=["charts"])
 
@@ -154,7 +155,7 @@ def annotations(ctx: C.Ctx, offset: int,
 @router.get("/{symbol}/candles", response_model=CandlesPayload)
 def candles(
     provider: ProviderDep,
-    symbol: Annotated[str, Path(max_length=32)],
+    symbol: Annotated[str, Path(max_length=32, pattern=SYMBOL_PATTERN)],
     timeframe: Annotated[TF, Query()] = "5m",
     limit: Annotated[int, Query(ge=20, le=500)] = 120,
     indicators: Annotated[str, Query(max_length=200)] = "ema9,ema21",

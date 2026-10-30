@@ -20,6 +20,7 @@ from app.learning import guard as learning_guard
 from app.learning import recorder as learning_recorder
 from app.market_data.factory import ProviderDep, provider_errors
 from app.market_data.provider import OPTION_UNDERLYINGS
+from app.schemas.common import SYMBOL_PATTERN
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 logger = logging.getLogger("app.analysis")
@@ -126,7 +127,7 @@ def analyse(
     provider: ProviderDep,
     db: DbDep,
     settings: SettingsDep,
-    symbol: Annotated[str, Path(max_length=32)],
+    symbol: Annotated[str, Path(max_length=32, pattern=SYMBOL_PATTERN)],
     timeframe: Annotated[TF, Query()] = "15m",
 ) -> AnalysisPayload:
     sym = symbol.upper()
@@ -200,7 +201,8 @@ class MultiTimeframePayload(BaseModel):
 
 @router.get("/{symbol}/mtf", response_model=MultiTimeframePayload)
 def multi_timeframe(provider: ProviderDep,
-                    symbol: Annotated[str, Path(max_length=32)]) -> MultiTimeframePayload:
+                    symbol: Annotated[str, Path(max_length=32, pattern=SYMBOL_PATTERN)],
+                    ) -> MultiTimeframePayload:
     sym = symbol.upper()
     views, source = [], "UNKNOWN"
     for tf in ("5m", "15m", "1h", "1d"):

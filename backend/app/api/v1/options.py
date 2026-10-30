@@ -4,13 +4,13 @@ import logging
 from datetime import date
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel
 
 from app.accounts import core as ACC
 from app.ai import registry
 from app.analysis import context as C
-from app.api.deps import AuthDep, DbDep, SettingsDep
+from app.api.deps import AuthDep, DbDep, SettingsDep, user_rate_limit
 from app.api.v1.market import Provenance
 from app.core.errors import AppError
 from app.market_data.factory import ProviderDep, provider_errors
@@ -143,7 +143,8 @@ def _direction(db: Any, underlying: str, timeframe: str, ctx: C.Ctx | None, sour
     return {**pred, "source": "PROMOTED_MODEL"}
 
 
-@router.get("/{underlying}/intelligence", response_model=IntelligencePayload)
+@router.get("/{underlying}/intelligence", response_model=IntelligencePayload,
+            dependencies=[Depends(user_rate_limit("options_intel"))])
 def intelligence(
     provider: ProviderDep,
     db: DbDep,

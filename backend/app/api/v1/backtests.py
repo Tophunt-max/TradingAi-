@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import AuthDep, DbDep, SettingsDep
+from app.api.deps import AuthDep, DbDep, SettingsDep, user_rate_limit
 from app.backtesting import service as svc
 from app.backtesting import strategies as S
 from app.backtesting.schemas import (
@@ -34,26 +34,26 @@ def strategies(_: AuthDep) -> list[dict[str, Any]]:
     return S.catalog()
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(user_rate_limit("backtests"))])
 def run(body: BacktestRequest, ctx: AuthDep, db: DbDep, provider: ProviderDep,
         settings: SettingsDep) -> dict[str, Any]:
     report, _ = svc.run(body, db, ctx.user.id, _limits(ctx, db), provider, settings)
     return report
 
 
-@router.post("/walk-forward")
+@router.post("/walk-forward", dependencies=[Depends(user_rate_limit("backtests"))])
 def walk_forward(body: WalkForwardRequest, ctx: AuthDep, db: DbDep, provider: ProviderDep,
                  settings: SettingsDep) -> dict[str, Any]:
     return svc.walk_forward(body, db, ctx.user.id, _limits(ctx, db), provider, settings)
 
 
-@router.post("/sensitivity")
+@router.post("/sensitivity", dependencies=[Depends(user_rate_limit("backtests"))])
 def sensitivity(body: SensitivityRequest, ctx: AuthDep, db: DbDep, provider: ProviderDep,
                 settings: SettingsDep) -> dict[str, Any]:
     return svc.sensitivity(body, db, ctx.user.id, _limits(ctx, db), provider, settings)
 
 
-@router.post("/monte-carlo")
+@router.post("/monte-carlo", dependencies=[Depends(user_rate_limit("backtests"))])
 def monte_carlo(body: MonteCarloRequest, ctx: AuthDep, db: DbDep, provider: ProviderDep,
                 settings: SettingsDep) -> dict[str, Any]:
     return svc.monte_carlo(body, db, ctx.user.id, _limits(ctx, db), provider, settings)

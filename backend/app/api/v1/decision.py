@@ -10,7 +10,7 @@ import logging
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Path, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from pydantic import ConfigDict
 from sqlalchemy import select
 
@@ -18,7 +18,7 @@ from app.accounts import core as ACC
 from app.ai import registry
 from app.analysis import pipeline
 from app.analysis import regime as R
-from app.api.deps import AdminDep, AuthDep, DbDep, SettingsDep
+from app.api.deps import AdminDep, AuthDep, DbDep, SettingsDep, user_rate_limit
 from app.api.v1.analysis import _REGIME_EVENT_LEVEL, _candles
 from app.api.v1.market import Provenance
 from app.core.time import utcnow
@@ -104,7 +104,8 @@ def _demo_blockers(acc: Any) -> list[str]:
     return [] if acc.status == "ACTIVE" else [f"The demo account is {acc.status}."]
 
 
-@router.get("/{underlying}", response_model=DecisionReport)
+@router.get("/{underlying}", response_model=DecisionReport,
+            dependencies=[Depends(user_rate_limit("decision"))])
 def decision_report(
     ctx: AuthDep, db: DbDep, settings: SettingsDep, provider: ProviderDep,
     underlying: Annotated[Underlying, Path()],

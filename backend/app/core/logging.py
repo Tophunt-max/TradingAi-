@@ -16,6 +16,18 @@ _SENSITIVE = re.compile(
     re.IGNORECASE,
 )
 _RESERVED = set(vars(logging.makeLogRecord({})).keys()) | {"message", "asctime"}
+# Credentials that can appear inside free text (messages, exception text, header values):
+# "Bearer <token>" and JWT-shaped strings.
+_INLINE = re.compile(
+    r"(?i)\b(bearer)\s+[A-Za-z0-9\-._~+/]+=*"
+    r"|\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}"
+)
+
+
+def scrub(text: str) -> str:
+    """Mask inline credentials in free text."""
+    return _INLINE.sub(lambda m: f"{m.group(1)} [REDACTED]" if m.group(1) else "[REDACTED]",
+                       text)
 
 
 def redact(value: Any) -> Any:
@@ -26,6 +38,8 @@ def redact(value: Any) -> Any:
         }
     if isinstance(value, list | tuple):
         return [redact(v) for v in value]
+    if isinstance(value, str):
+        return scrub(value)
     return value
 
 
@@ -35,14 +49,14 @@ class JsonFormatter(logging.Formatter):
             "ts": datetime.fromtimestamp(record.created, UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "msg": record.getMessage(),
+            "msg": scrub(record.getMessage()),
             "request_id": get_request_id(),
         }
         extras = {k: v for k, v in record.__dict__.items() if k not in _RESERVED}
         if extras:
             payload.update(redact(extras))
         if record.exc_info:
-            payload["exc"] = self.formatException(record.exc_info)
+            payload["exc"] = scrub(self.formatException(record.exc_info))
         return json.dumps(payload, default=str)
 
 

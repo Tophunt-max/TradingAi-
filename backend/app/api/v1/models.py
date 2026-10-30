@@ -4,12 +4,12 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.ai import registry
-from app.api.deps import AdminDep, DbDep, SettingsDep
+from app.api.deps import AdminDep, DbDep, SettingsDep, user_rate_limit
 from app.core.errors import NotFoundError
 from app.learning import promotion
 from app.market_data.factory import ProviderDep, build_provider, provider_errors
@@ -177,7 +177,8 @@ class TrainRequest(BaseModel):
     seed: int = Field(default=0, ge=0, le=2**31 - 1)
 
 
-@router.post("/admin/models/train", response_model=ModelOut, status_code=201)
+@router.post("/admin/models/train", response_model=ModelOut, status_code=201,
+             dependencies=[Depends(user_rate_limit("model_train"))])
 def train(body: TrainRequest, ctx: AdminDep, db: DbDep, settings: SettingsDep,
           request: Request) -> ModelOut:
     with provider_errors():

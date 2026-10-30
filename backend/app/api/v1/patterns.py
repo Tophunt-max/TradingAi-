@@ -11,6 +11,7 @@ from app.api.v1.market import Provenance
 from app.core.errors import ServiceUnavailableError
 from app.indicators.core import INDICATOR_VERSION
 from app.market_data.factory import ProviderDep, provider_errors
+from app.schemas.common import SYMBOL_PATTERN
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -39,7 +40,7 @@ class PatternStatsPayload(Provenance):
 @router.get("/{symbol}/patterns/stats", response_model=PatternStatsPayload)
 def pattern_stats(
     provider: ProviderDep,
-    symbol: Annotated[str, Path(max_length=32)],
+    symbol: Annotated[str, Path(max_length=32, pattern=SYMBOL_PATTERN)],
     timeframe: Annotated[TF, Query()] = "15m",
     horizon: Annotated[int, Query(ge=1, le=50)] = 5,
     cost_bps: Annotated[float, Query(ge=0, le=500)] = 5.0,

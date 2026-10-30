@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
@@ -8,11 +9,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 
-from app.api.deps import AdminDep, DbDep, SettingsDep
+from app.api.deps import AdminDep, AuthDep, DbDep, SettingsDep
 from app.core.time import utcnow
 from app.learning import drift, metrics
 from app.learning.attribution import ERROR_CLASSES
 from app.market_data.factory import ProviderDep
+from app.models.bots import Bot
+from app.models.execution import Order
 from app.models.intelligence import DecisionRecord, ModelDriftReport
 from app.models.ml import ModelVersion
 from app.schemas.common import Page, PageParams
@@ -81,18 +84,62 @@ def _filtered(symbol: str | None, timeframe: str | None, decision: str | None = 
     return stmt
 
 
+# Fields that describe one user's trading (their order/position, account mode, fill slippage
+# and premium change). Decision records are shared per instrument, so these are shown only
+# to the user who owns the bot/order behind the record.
+_PRIVATE_FIELDS = ("order_id", "position_id", "account_mode", "slippage",
+                   "option_premium_change")
+
+
+def _owned(db: Any, user_id: uuid.UUID, rows: list[DecisionRecord]) -> set[uuid.UUID]:
+    """Ids of the records whose bot or order belongs to `user_id`."""
+    bot_ids: dict[uuid.UUID, list[uuid.UUID]] = {}
+    order_ids: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for r in rows:
+        if r.origin == "BOT" and r.origin_ref:
+            with contextlib.suppress(ValueError):
+                bot_ids.setdefault(uuid.UUID(hex=r.origin_ref), []).append(r.id)
+        if r.order_id is not None:
+            order_ids.setdefault(r.order_id, []).append(r.id)
+    owned: set[uuid.UUID] = set()
+    if bot_ids:
+        for b in db.scalars(select(Bot.id).where(Bot.id.in_(bot_ids), Bot.user_id == user_id)):
+            owned.update(bot_ids[b])
+    if order_ids:
+        for o in db.scalars(select(Order.id).where(Order.id.in_(order_ids),
+                                                   Order.user_id == user_id)):
+            owned.update(order_ids[o])
+    return owned
+
+
+def _private(r: DecisionRecord) -> bool:
+    return r.origin == "BOT" or any(getattr(r, f) is not None for f in _PRIVATE_FIELDS)
+
+
+def _out(r: DecisionRecord, owned: set[uuid.UUID]) -> DecisionOut:
+    out = DecisionOut.model_validate(r)
+    if _private(r) and r.id not in owned:
+        out = out.model_copy(update=dict.fromkeys(_PRIVATE_FIELDS))
+    return out
+
+
 @router.get("/learning/decisions", response_model=Page[DecisionOut])
-def decisions(_: ProviderDep, db: DbDep, page: Annotated[PageParams, Depends()],
+def decisions(_: ProviderDep, ctx: AuthDep, db: DbDep,
+              page: Annotated[PageParams, Depends()],
               symbol: Annotated[str | None, Query(max_length=32)] = None,
               timeframe: Annotated[str | None, Query(max_length=8)] = None,
               decision: Annotated[str | None, Query(max_length=20)] = None,
               status: Annotated[str | None, Query(max_length=12)] = None) -> Page[DecisionOut]:
-    """Every recorded decision, including NO TRADE and skipped ones, newest first."""
+    """Every recorded decision, including NO TRADE and skipped ones, newest first.
+
+    Another user's order/position ids, account mode, slippage and premium change are
+    redacted (null)."""
     stmt = _filtered(symbol, timeframe, decision, status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(stmt.order_by(DecisionRecord.decision_ts.desc())
                       .limit(page.limit).offset(page.offset)).all()
-    return Page(items=[DecisionOut.model_validate(r) for r in rows], total=total,
+    owned = _owned(db, ctx.user.id, list(rows))
+    return Page(items=[_out(r, owned) for r in rows], total=total,
                 limit=page.limit, offset=page.offset)
 
 

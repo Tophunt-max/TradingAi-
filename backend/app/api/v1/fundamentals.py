@@ -11,6 +11,7 @@ from app.core.errors import AppError
 from app.core.time import ensure_utc, utcnow
 from app.fundamentals import service, store
 from app.market_data.factory import ProviderDep
+from app.schemas.common import SYMBOL_PATTERN
 from app.services.audit import record_audit
 
 router = APIRouter(tags=["fundamentals"])
@@ -38,7 +39,7 @@ class FundamentalsPayload(BaseModel):
 
 @router.get("/fundamentals/{symbol}", response_model=FundamentalsPayload)
 def get_fundamentals(provider: ProviderDep, db: DbDep, settings: SettingsDep,
-                     symbol: Annotated[str, Path(max_length=32)],
+                     symbol: Annotated[str, Path(max_length=32, pattern=SYMBOL_PATTERN)],
                      as_of: Annotated[datetime | None, Query()] = None) -> FundamentalsPayload:
     """Point-in-time fundamentals. `as_of` defaults to now; future times are rejected."""
     if as_of is not None and ensure_utc(as_of) > utcnow():

@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.errors import AuthenticationError, PermissionDeniedError
+from app.core.errors import AuthenticationError, PermissionDeniedError, RateLimitedError
 from app.core.security import decode_access_token
 from app.core.time import ensure_utc, utcnow
 from app.db.session import get_db
@@ -77,3 +77,22 @@ def require_role(*roles: UserRole) -> Callable[[AuthContext], AuthContext]:
 
 
 AdminDep = Annotated[AuthContext, Depends(require_role(UserRole.ADMIN))]
+
+
+def user_rate_limit(scope: str) -> Callable[..., None]:
+    """Per-user fixed-window limit for expensive endpoints (EXPENSIVE_RATE_LIMIT requests per
+    EXPENSIVE_RATE_WINDOW_SECONDS). Runs after authentication, so the key is the user id."""
+    from app.core import rate_limit as rl
+
+    def dependency(ctx: AuthDep, settings: SettingsDep) -> None:
+        win = settings.expensive_rate_window_seconds
+        try:
+            count = rl.get_store().hit(f"rlu:{scope}:{ctx.user.id}", win)
+        except Exception:  # Redis outage: fail open, as the IP limiter does.
+            rl.logger.warning("rate_limit_store_unavailable", extra={"scope": scope})
+            return
+        if count > settings.expensive_rate_limit:
+            raise RateLimitedError("Too many requests for this operation. Try again shortly.",
+                                   headers={"Retry-After": str(win)})
+
+    return dependency

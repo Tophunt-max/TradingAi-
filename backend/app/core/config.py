@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # Rate limits (requests per window, per client IP and route)
     auth_rate_limit: int = 10
     auth_rate_window_seconds: int = 60
+    # Per-user limit for compute-heavy endpoints (backtests, decision, intelligence
+    # dashboard, options intelligence, model training).
+    expensive_rate_limit: int = Field(default=60, ge=1, le=100000)
+    expensive_rate_window_seconds: int = Field(default=60, ge=1, le=3600)
 
     # Market data & trading
     market_data_mode: MarketDataMode = MarketDataMode.DEMO

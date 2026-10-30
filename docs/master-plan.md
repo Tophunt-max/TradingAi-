@@ -33,7 +33,7 @@ Status: ✅ done and tested · 🟡 partial · ⛔ blocked on something outside 
 | O | AI Intelligence Dashboard, Backtesting Lab, Reports screens; mode shown everywhere | P2 §5, P3 M16 | 🟡 dashboard, decision report and active-mode badges done; Reports screens belong to Q; backtests are not persisted, so the dashboard links to the lab | [mobile.md](mobile.md) |
 | P | Real broker adapter (broker-neutral, one adapter, OAuth, sync, reconciliation), live locked | P2 §4B, §17, P3 Ph10 | 🟡 interface, INDstocks adapter (token paste, from official docs), encrypted connections, sync snapshots, reconciliation, permissions checklist done and tested on a fake; ⛔ unverified against the live API (no token), live trading locked by design | [broker-integration.md](broker-integration.md) |
 | Q | Reports, daily report, CSV, alerts | P2 §21 | ✅ daily report, P&L analytics, CSV exports, stored reports + worker, report/broker alerts, optional Telegram; native CSV export needs a file-sharing module (web only) | [reports.md](reports.md) |
-| R | Security, regression, performance tests; deployment docs | P2 Ph9, P3 M17 | ⏳ | [security-testing.md](security-testing.md), [deployment.md](deployment.md) |
+| R | Security, regression, performance tests; deployment docs | P2 Ph9, P3 M17 | 🟡 partial: per-user rate limit on expensive endpoints, inline token/JWT redaction in logs, symbol path validation, decision-record privacy (other users' order/account fields hidden). Not done yet: route-wide auth test, perf benchmarks, backup scripts, prod compose, deployment.md, security-testing.md | — |
 
 ## Things this repository cannot do by itself
 

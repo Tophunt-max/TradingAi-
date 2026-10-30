@@ -12,12 +12,12 @@ from collections.abc import Callable
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 
 from app.accounts import core as ACC
 from app.ai import registry
-from app.api.deps import AuthDep, DbDep, SettingsDep
+from app.api.deps import AuthDep, DbDep, SettingsDep, user_rate_limit
 from app.api.v1.analysis import _REGIME_EVENT_LEVEL, _candles
 from app.api.v1.decision import prediction_for
 from app.api.v1.system import live_blockers
@@ -64,7 +64,7 @@ def _record_out(r: DecisionRecord) -> dict[str, Any]:
             "reasons": (r.no_trade_reasons or [])[:3]}
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", dependencies=[Depends(user_rate_limit("intelligence"))])
 def dashboard(ctx: AuthDep, db: DbDep, settings: SettingsDep, provider: ProviderDep,
               underlying: Annotated[Literal["NIFTY", "BANKNIFTY"], Query()] = "NIFTY",
               timeframe: Annotated[Literal["5m", "15m", "1h"], Query()] = "15m"
